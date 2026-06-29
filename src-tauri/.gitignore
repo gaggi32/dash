@@ -1,0 +1,21 @@
+# ─────────────────────────────────────────────────────────────
+# Rust build output (compiled binaries, release bundles/installers,
+# the downloaded WiX/NSIS bundlers — everything rebuildable).
+# ─────────────────────────────────────────────────────────────
+/target/
+
+# ─────────────────────────────────────────────────────────────
+# Tauri-generated files
+# `gen/schemas/` is regenerated from tauri.conf.json + capabilities
+# on every build, so it shouldn't be committed.
+# ─────────────────────────────────────────────────────────────
+/gen/schemas/
+
+# ─────────────────────────────────────────────────────────────
+# Local env (sqlx/dotenvy reads DATABASE_URL etc. from here)
+# ─────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# Keep Cargo.lock committed — this is an application, not a library.

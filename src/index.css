@@ -1,0 +1,228 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+
+  /* Brand accent — a soft indigo→violet that reads well on light and dark. */
+  --accent: 99 102 241; /* indigo-500 */
+  --accent-2: 168 85 247; /* purple-500 */
+}
+
+/* Smooth, system-native typography. */
+html,
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * The quick-add window is borderless + transparent so the rounded card below
+ * defines the visible surface. `html.quick` is set in quick.html only, so the
+ * full window keeps a normal opaque background.
+ */
+html.quick,
+html.quick body,
+html.quick #root {
+  background: transparent;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* Don't let text selection / drag highlight leak in the chrome-less quick window. */
+html.quick {
+  user-select: none;
+}
+html.quick input {
+  user-select: text;
+}
+
+/* ----------------------------------------------------------------------------
+ * Liquid flow-in entrance.
+ *
+ * The card morphs in from a blurred, squished blob — border-radius animates
+ * through organic values so it reads like liquid coalescing, blur settles to
+ * sharp, and a gentle overshoot gives it a soft, fluid "plop" as it lands.
+ * Re-keying the element in React replays this every time the window appears.
+ * ------------------------------------------------------------------------- */
+@keyframes liquid-in {
+  0% {
+    opacity: 0;
+    transform: translateY(22px) scale(0.9);
+    filter: blur(16px);
+    border-radius: 42% 58% 56% 44% / 56% 44% 60% 40%;
+  }
+  45% {
+    opacity: 1;
+    filter: blur(3px);
+    border-radius: 38% 42% 40% 44% / 44% 40% 44% 40%;
+  }
+  72% {
+    transform: translateY(-3px) scale(1.015);
+    filter: blur(0);
+    border-radius: 26px;
+  }
+  88% {
+    transform: translateY(1px) scale(0.997);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+    border-radius: 24px;
+  }
+}
+
+/* A wet highlight that sweeps across the surface as it settles. */
+@keyframes liquid-sheen {
+  0% {
+    opacity: 0;
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  35% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(220%) skewX(-18deg);
+  }
+}
+
+/* Inner controls drift up and fade in just after the surface lands. */
+@keyframes rise-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.liquid-in {
+  position: relative;
+  animation: liquid-in 620ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
+  will-change: transform, filter, border-radius;
+}
+
+/* The sweeping sheen sits above the surface but below the content. */
+.liquid-in::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 70%
+  );
+  pointer-events: none;
+  animation: liquid-sheen 760ms ease-out 120ms both;
+  mix-blend-mode: overlay;
+}
+
+.rise-in {
+  animation: rise-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 220ms;
+}
+
+/* Brief "Added ✓" confirmation that floats up and fades after a save. */
+@keyframes confirm-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(5px) scale(0.9);
+  }
+  16% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  78% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.98);
+  }
+}
+.confirm-pop {
+  animation: confirm-pop 1200ms ease both;
+}
+
+/* Soft pop used for menus / calendars opening inside a window. */
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.pop-in {
+  animation: pop-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top center;
+}
+
+/* Slow drifting gradient blobs for the home backdrop. */
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(18px, -22px) scale(1.08);
+  }
+}
+.drift {
+  animation: drift 18s ease-in-out infinite;
+}
+.drift-slow {
+  animation: drift 26s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid-in,
+  .liquid-in::after,
+  .rise-in,
+  .pop-in,
+  .drift,
+  .drift-slow {
+    animation: none !important;
+  }
+}
+
+/* Quiet, modern scrollbar for the task list. */
+.tidy-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(0 0 0 / 0.18) transparent;
+}
+.tidy-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.tidy-scroll::-webkit-scrollbar-thumb {
+  background: rgb(0 0 0 / 0.16);
+  border-radius: 9999px;
+}
+.tidy-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(0 0 0 / 0.28);
+}
+@media (prefers-color-scheme: dark) {
+  .tidy-scroll {
+    scrollbar-color: rgb(255 255 255 / 0.18) transparent;
+  }
+  .tidy-scroll::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 0.16);
+  }
+  .tidy-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgb(255 255 255 / 0.3);
+  }
+}
