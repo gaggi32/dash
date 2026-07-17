@@ -5,10 +5,16 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, WindowEvent,
 };
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::{
     Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
 };
 use tauri_plugin_sql::{Migration, MigrationKind};
+
+/// Flag we pass to ourselves in the autostart registration. When Windows/macOS
+/// launches Dash at login it runs `Dash --hidden`, so we can stay in the tray
+/// instead of popping the main window in the user's face.
+const AUTOSTART_FLAG: &str = "--hidden";
 
 const QUICK_LABEL: &str = "quick";
 const MAIN_LABEL: &str = "main";
@@ -156,7 +162,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
+            Some(vec![AUTOSTART_FLAG]),
         ))
         .invoke_handler(tauri::generate_handler![
             hide_quick,
@@ -191,6 +197,23 @@ pub fn run() {
             }
 
             build_tray(handle)?;
+
+            // If autostart is on, re-register it so the login entry always points
+            // at THIS executable. This heals a stale path left behind by a dev
+            // build (which would open a console and fail to reach the dev server).
+            let autostart = app.autolaunch();
+            if autostart.is_enabled().unwrap_or(false) {
+                let _ = autostart.enable();
+            }
+
+            // Launched at login (`--hidden`) → stay in the tray. Any other launch
+            // (double-clicking the app) → show the main window so it's obvious
+            // Dash actually started.
+            let launched_hidden = std::env::args().any(|a| a == AUTOSTART_FLAG);
+            if !launched_hidden {
+                show_main(handle);
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())

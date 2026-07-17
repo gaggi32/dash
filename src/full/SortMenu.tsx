@@ -42,7 +42,7 @@ export default function SortMenu({ value, onChange }: Props) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-black/5 bg-white/70 px-2.5 py-1.5 text-[13px] font-medium text-neutral-600 transition-colors hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-neutral-200 dark:hover:bg-white/10"
+        className="surface inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-neutral-600 transition-colors hover:border-blue-400/60 hover:text-neutral-900 focus:border-blue-500 focus:outline-none dark:text-neutral-300 dark:hover:border-blue-500/40 dark:hover:text-neutral-100"
       >
         <SortIcon className="text-[15px] text-neutral-400" />
         {current.label}
@@ -55,7 +55,7 @@ export default function SortMenu({ value, onChange }: Props) {
       </button>
 
       {open && (
-        <div className="pop-in absolute right-0 z-30 mt-1.5 min-w-[150px] overflow-hidden rounded-xl border border-black/5 bg-white/90 p-1 shadow-xl ring-1 ring-black/5 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-800/95 dark:ring-white/5">
+        <div className="pop-in surface absolute right-0 z-30 mt-1.5 min-w-[150px] overflow-hidden rounded-lg p-1 shadow-md">
           {OPTIONS.map((o) => {
             const active = o.key === value;
             return (
@@ -67,10 +67,10 @@ export default function SortMenu({ value, onChange }: Props) {
                   setOpen(false);
                 }}
                 className={[
-                  "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-[13px] font-medium transition-colors",
+                  "flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-[13px] font-medium transition-colors",
                   active
-                    ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300"
-                    : "text-neutral-600 hover:bg-black/5 dark:text-neutral-200 dark:hover:bg-white/10",
+                    ? "accent-soft"
+                    : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800",
                 ].join(" ")}
               >
                 {o.label}

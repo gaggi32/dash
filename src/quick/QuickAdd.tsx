@@ -14,15 +14,18 @@ import { formatDue } from "../lib/date";
 
 // Default (collapsed) and expanded sizes. Must match the `quick` window size in
 // tauri.conf.json so the first paint isn't resized. Expanded fits the calendar.
-const COMPACT = new LogicalSize(440, 168);
-const EXPANDED = new LogicalSize(440, 476);
+// The window is transparent and sized to the card *plus* the `p-7` margin around
+// it, so the card's drop shadow has room to fall off instead of being clipped
+// hard at the window edge.
+const COMPACT = new LogicalSize(440, 204);
+const EXPANDED = new LogicalSize(440, 512);
 
 export default function QuickAdd() {
   const win = getCurrentWindow();
   const [title, setTitle] = useState("");
   const [due, setDue] = useState<string | null>(null);
   const [calOpen, setCalOpen] = useState(false);
-  // Bumped each time the window is shown so the liquid entrance replays.
+  // Bumped each time the window is shown so the entrance fade replays.
   const [appear, setAppear] = useState(0);
   // Bumped on each save to flash a brief "Added ✓" confirmation.
   const [added, setAdded] = useState(0);
@@ -113,16 +116,13 @@ export default function QuickAdd() {
   }, [hide]);
 
   return (
-    <div className="flex h-screen w-screen items-start justify-center p-2.5">
+    <div className="flex h-screen w-screen items-start justify-center p-7">
       <div
         key={appear}
-        className="liquid-in w-full overflow-hidden rounded-[24px] border border-white/60 bg-white/80 shadow-[0_24px_60px_-12px_rgba(31,38,135,0.35)] ring-1 ring-black/5 backdrop-blur-2xl dark:border-white/10 dark:bg-neutral-900/75 dark:ring-white/5"
+        className="appear surface w-full overflow-hidden rounded-2xl bg-gradient-to-b from-white to-blue-50/70 shadow-xl shadow-neutral-950/10 backdrop-blur-md dark:from-neutral-900 dark:to-blue-950/50 dark:shadow-black/40"
       >
-        {/* Subtle top sheen so the glass reads as a real surface. */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent dark:via-white/20" />
-
         <form
-          className="rise-in relative p-3.5"
+          className="relative p-3.5"
           onSubmit={(e) => {
             e.preventDefault();
             void send();
@@ -134,7 +134,7 @@ export default function QuickAdd() {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="What needs doing?"
             autoFocus
-            className="w-full rounded-2xl border border-black/5 bg-black/[0.035] px-4 py-3 text-[15px] font-medium tracking-tight text-neutral-900 outline-none transition-all placeholder:font-normal placeholder:text-neutral-400 focus:border-indigo-400/40 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 dark:border-white/5 dark:bg-white/[0.06] dark:text-neutral-50 dark:focus:bg-white/[0.09] dark:focus:ring-indigo-400/15"
+            className="w-full rounded-lg border border-neutral-200 bg-white/70 px-4 py-3 text-[15px] font-medium tracking-tight text-neutral-900 outline-none ring-1 ring-inset ring-white/60 transition-colors placeholder:font-normal placeholder:text-neutral-400 focus:border-blue-500 focus:bg-white focus:ring-blue-500/20 dark:border-neutral-700 dark:bg-neutral-800/70 dark:text-neutral-50 dark:ring-white/5 dark:focus:border-blue-500"
           />
 
           <div className="mt-2.5 flex items-center gap-2">
@@ -142,10 +142,10 @@ export default function QuickAdd() {
               type="button"
               onClick={() => setCalOpen((v) => !v)}
               className={[
-                "inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-medium transition-all",
+                "inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors",
                 due
-                  ? "bg-indigo-500/10 text-indigo-600 ring-1 ring-indigo-500/20 dark:bg-indigo-400/15 dark:text-indigo-300"
-                  : "text-neutral-500 hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10",
+                  ? "accent-soft"
+                  : "text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800",
               ].join(" ")}
             >
               <CalendarIcon className="text-[15px]" />
@@ -167,7 +167,7 @@ export default function QuickAdd() {
                 type="button"
                 onClick={() => void goHome()}
                 title="Open full app"
-                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-medium text-neutral-500 transition-colors hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10"
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[13px] font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
               >
                 <HomeIcon className="text-[15px]" />
                 Home
@@ -175,7 +175,7 @@ export default function QuickAdd() {
               <button
                 type="submit"
                 disabled={!title.trim()}
-                className="group inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 px-4 py-2 text-[13px] font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 enabled:hover:-translate-y-px disabled:from-neutral-300 disabled:to-neutral-300 disabled:text-neutral-500 disabled:shadow-none dark:disabled:from-white/10 dark:disabled:to-white/10 dark:disabled:text-neutral-500"
+                className="accent accent-hover group inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-medium transition-colors disabled:from-neutral-200 disabled:to-neutral-200 disabled:text-neutral-400 disabled:shadow-none disabled:ring-0 dark:disabled:from-neutral-800 dark:disabled:to-neutral-800 dark:disabled:text-neutral-600"
               >
                 Add
                 <ArrowRightIcon className="text-[15px] transition-transform group-enabled:group-hover:translate-x-0.5" />

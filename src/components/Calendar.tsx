@@ -39,12 +39,12 @@ export default function Calendar({ value, onChange }: Props) {
   const shift = (delta: number) => setCursor(new Date(year, month + delta, 1));
 
   return (
-    <div className="select-none rounded-2xl border border-black/5 bg-white/90 p-3 text-sm shadow-lg backdrop-blur dark:border-white/10 dark:bg-neutral-800/90">
+    <div className="surface select-none rounded-xl p-3 text-sm shadow-md">
       <div className="mb-2 flex items-center justify-between">
         <button
           type="button"
           onClick={() => shift(-1)}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-[16px] text-neutral-500 transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-[16px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
           aria-label="Previous month"
         >
           <ChevronLeft />
@@ -55,7 +55,7 @@ export default function Calendar({ value, onChange }: Props) {
         <button
           type="button"
           onClick={() => shift(1)}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-[16px] text-neutral-500 transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-[16px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
           aria-label="Next month"
         >
           <ChevronRight />
@@ -81,12 +81,12 @@ export default function Calendar({ value, onChange }: Props) {
               type="button"
               onClick={() => onChange(toISODate(date))}
               className={[
-                "mx-auto flex h-8 w-8 items-center justify-center rounded-full text-[13px] transition-all",
+                "mx-auto flex h-8 w-8 items-center justify-center rounded-md text-[13px] transition-colors",
                 isSelected
-                  ? "bg-gradient-to-br from-indigo-500 to-purple-600 font-semibold text-white shadow-md shadow-indigo-500/30"
-                  : "hover:bg-black/5 dark:hover:bg-white/10",
+                  ? "accent font-medium"
+                  : "hover:bg-neutral-100 dark:hover:bg-neutral-800",
                 !isSelected && isToday
-                  ? "font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-500/30 dark:text-indigo-400"
+                  ? "font-semibold text-blue-600 ring-1 ring-inset ring-blue-300 dark:text-blue-400 dark:ring-blue-500/40"
                   : "",
               ].join(" ")}
             >
@@ -96,18 +96,18 @@ export default function Calendar({ value, onChange }: Props) {
         })}
       </div>
 
-      <div className="mt-2 flex justify-between border-t border-black/5 pt-2 text-xs dark:border-white/10">
+      <div className="mt-2 flex justify-between border-t border-neutral-200 pt-2 text-xs dark:border-neutral-800">
         <button
           type="button"
           onClick={() => onChange(toISODate(new Date()))}
-          className="rounded-lg px-2.5 py-1 font-medium text-indigo-600 transition-colors hover:bg-indigo-500/10 dark:text-indigo-400"
+          className="rounded-md px-2.5 py-1 font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-500/10"
         >
           Today
         </button>
         <button
           type="button"
           onClick={() => onChange(null)}
-          className="rounded-lg px-2.5 py-1 font-medium text-neutral-500 transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+          className="rounded-md px-2.5 py-1 font-medium text-neutral-500 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
         >
           Clear
         </button>

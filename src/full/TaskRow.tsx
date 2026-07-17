@@ -38,7 +38,7 @@ export default function TaskRow({ task, onToggle, onSave, onDelete }: Props) {
 
   if (editing) {
     return (
-      <li className="rounded-2xl border border-indigo-400/40 bg-white p-3.5 shadow-md shadow-indigo-500/10 ring-4 ring-indigo-500/10 dark:bg-neutral-800">
+      <li className="surface rounded-xl border-blue-400/70 p-3.5 ring-blue-500/10 dark:border-blue-500/50">
         <input
           value={title}
           autoFocus
@@ -47,17 +47,17 @@ export default function TaskRow({ task, onToggle, onSave, onDelete }: Props) {
             if (e.key === "Enter") commit();
             if (e.key === "Escape") cancel();
           }}
-          className="w-full rounded-xl bg-black/[0.04] px-3 py-2 font-medium outline-none focus:ring-2 focus:ring-indigo-500/30 dark:bg-white/10"
+          className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 font-medium outline-none transition-colors focus:border-blue-500 dark:border-neutral-700 dark:bg-neutral-800 dark:focus:border-blue-500"
         />
         <div className="mt-2.5 flex flex-wrap items-center gap-2 text-sm">
           <button
             type="button"
             onClick={() => setCalOpen((v) => !v)}
             className={[
-              "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
               due
-                ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300"
-                : "text-neutral-500 hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10",
+                ? "accent-soft"
+                : "text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800",
             ].join(" ")}
           >
             <CalendarIcon className="text-[15px]" />
@@ -67,14 +67,14 @@ export default function TaskRow({ task, onToggle, onSave, onDelete }: Props) {
             <button
               type="button"
               onClick={cancel}
-              className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-neutral-500 hover:bg-black/5 dark:hover:bg-white/10"
+              className="rounded-md px-3 py-1.5 text-[13px] font-medium text-neutral-500 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={commit}
-              className="rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 px-4 py-1.5 text-[13px] font-semibold text-white shadow-md shadow-indigo-500/25 transition-transform hover:-translate-y-px"
+              className="accent accent-hover rounded-md px-4 py-1.5 text-[13px] font-medium transition-colors"
             >
               Save
             </button>
@@ -98,16 +98,16 @@ export default function TaskRow({ task, onToggle, onSave, onDelete }: Props) {
   const overdue = !task.completed && isOverdue(task.dueDate);
 
   return (
-    <li className="group flex items-center gap-3 rounded-2xl border border-black/5 bg-white/70 p-3.5 shadow-sm backdrop-blur transition-all hover:border-black/10 hover:shadow-md dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/[0.08]">
+    <li className="surface group flex items-center gap-3 rounded-xl p-3.5 transition-colors hover:border-blue-400/60 dark:hover:border-blue-500/40">
       <button
         type="button"
         onClick={() => onToggle(!task.completed)}
         title={task.completed ? "Mark active" : "Mark done"}
         className={[
-          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all",
+          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors",
           task.completed
-            ? "border-transparent bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-sm shadow-indigo-500/30"
-            : "border-black/20 text-transparent hover:border-indigo-400 dark:border-white/25",
+            ? "accent border-transparent"
+            : "border-neutral-300 text-transparent hover:border-blue-500 dark:border-neutral-600 dark:hover:border-blue-500",
         ].join(" ")}
       >
         <CheckIcon className="text-[13px]" strokeWidth={3} />
@@ -134,7 +134,7 @@ export default function TaskRow({ task, onToggle, onSave, onDelete }: Props) {
             className={[
               "mt-0.5 inline-flex items-center gap-1 text-xs font-medium",
               overdue
-                ? "text-rose-500"
+                ? "text-red-600 dark:text-red-400"
                 : "text-neutral-400 dark:text-neutral-500",
             ].join(" ")}
           >
@@ -149,7 +149,7 @@ export default function TaskRow({ task, onToggle, onSave, onDelete }: Props) {
         type="button"
         onClick={onDelete}
         title="Delete task"
-        className="shrink-0 rounded-lg p-2 text-neutral-400 opacity-0 transition-all hover:bg-rose-500/10 hover:text-rose-500 focus:opacity-100 group-hover:opacity-100"
+        className="shrink-0 rounded-md p-2 text-neutral-400 opacity-0 transition-colors hover:bg-neutral-100 hover:text-red-600 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-neutral-800 dark:hover:text-red-400"
       >
         <TrashIcon className="text-[16px]" />
       </button>

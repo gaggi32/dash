@@ -4,10 +4,40 @@
 
 :root {
   color-scheme: light dark;
+}
 
-  /* Brand accent — a soft indigo→violet that reads well on light and dark. */
-  --accent: 99 102 241; /* indigo-500 */
-  --accent-2: 168 85 247; /* purple-500 */
+/* ----------------------------------------------------------------------------
+ * Shared surfaces. Defined once here rather than repeated inline so every card,
+ * accent and outline in both windows stays in step.
+ * ------------------------------------------------------------------------- */
+@layer components {
+  /* Window backdrop: a barely-there wash from white into the accent hue. */
+  .app-bg {
+    @apply bg-gradient-to-b from-white via-neutral-50 to-blue-50;
+    @apply dark:from-neutral-950 dark:via-neutral-950 dark:to-blue-950/40;
+  }
+
+  /* Cards, inputs, popovers. The inset ring reads as a light catch along the
+     top edge and keeps the 1px border from looking harsh on either theme. */
+  .surface {
+    @apply border border-neutral-200/90 bg-white/85 shadow-sm shadow-neutral-950/[0.04] ring-1 ring-inset ring-white/60 backdrop-blur-sm;
+    @apply dark:border-neutral-700/80 dark:bg-neutral-900/85 dark:shadow-black/20 dark:ring-white/5;
+  }
+
+  /* Filled accent: buttons, the logo mark, the active filter pill. */
+  .accent {
+    @apply bg-gradient-to-b from-blue-500 to-indigo-600 text-white shadow-sm shadow-blue-600/25 ring-1 ring-inset ring-white/20;
+    @apply dark:from-blue-500 dark:to-indigo-600 dark:shadow-blue-950/40;
+  }
+  .accent-hover {
+    @apply enabled:hover:from-blue-400 enabled:hover:to-indigo-500;
+  }
+
+  /* Tinted accent: date chips and the empty-state glyph. */
+  .accent-soft {
+    @apply bg-gradient-to-b from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-inset ring-blue-500/10;
+    @apply dark:from-blue-500/10 dark:to-indigo-500/10 dark:text-blue-300 dark:ring-blue-400/20;
+  }
 }
 
 /* Smooth, system-native typography. */
@@ -43,164 +73,55 @@ html.quick input {
 }
 
 /* ----------------------------------------------------------------------------
- * Liquid flow-in entrance.
- *
- * The card morphs in from a blurred, squished blob — border-radius animates
- * through organic values so it reads like liquid coalescing, blur settles to
- * sharp, and a gentle overshoot gives it a soft, fluid "plop" as it lands.
- * Re-keying the element in React replays this every time the window appears.
+ * Motion. Kept deliberately minimal: things fade in over a short distance and
+ * get out of the way. Nothing here should draw attention to itself.
  * ------------------------------------------------------------------------- */
-@keyframes liquid-in {
-  0% {
+@keyframes fade-rise {
+  from {
     opacity: 0;
-    transform: translateY(22px) scale(0.9);
-    filter: blur(16px);
-    border-radius: 42% 58% 56% 44% / 56% 44% 60% 40%;
+    transform: translateY(4px);
   }
-  45% {
-    opacity: 1;
-    filter: blur(3px);
-    border-radius: 38% 42% 40% 44% / 44% 40% 44% 40%;
-  }
-  72% {
-    transform: translateY(-3px) scale(1.015);
-    filter: blur(0);
-    border-radius: 26px;
-  }
-  88% {
-    transform: translateY(1px) scale(0.997);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0);
-    border-radius: 24px;
-  }
-}
-
-/* A wet highlight that sweeps across the surface as it settles. */
-@keyframes liquid-sheen {
-  0% {
-    opacity: 0;
-    transform: translateX(-120%) skewX(-18deg);
-  }
-  35% {
-    opacity: 0.55;
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(220%) skewX(-18deg);
-  }
-}
-
-/* Inner controls drift up and fade in just after the surface lands. */
-@keyframes rise-in {
-  0% {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  100% {
+  to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-.liquid-in {
-  position: relative;
-  animation: liquid-in 620ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
-  will-change: transform, filter, border-radius;
+/* The quick-add card as the window is shown. Re-keying it in React replays this. */
+.appear {
+  animation: fade-rise 140ms ease-out both;
 }
 
-/* The sweeping sheen sits above the surface but below the content. */
-.liquid-in::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    105deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.55) 50%,
-    transparent 70%
-  );
-  pointer-events: none;
-  animation: liquid-sheen 760ms ease-out 120ms both;
-  mix-blend-mode: overlay;
+/* Menus, popovers and the calendar opening inside a window. */
+.pop-in {
+  animation: fade-rise 120ms ease-out both;
 }
 
-.rise-in {
-  animation: rise-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: 220ms;
-}
-
-/* Brief "Added ✓" confirmation that floats up and fades after a save. */
-@keyframes confirm-pop {
+/* Brief "Added" confirmation shown after a save, then faded back out. */
+@keyframes confirm {
   0% {
     opacity: 0;
-    transform: translateY(5px) scale(0.9);
   }
-  16% {
+  12%,
+  80% {
     opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  78% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translateY(-3px) scale(0.98);
   }
 }
 .confirm-pop {
-  animation: confirm-pop 1200ms ease both;
-}
-
-/* Soft pop used for menus / calendars opening inside a window. */
-@keyframes pop-in {
-  0% {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.97);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-.pop-in {
-  animation: pop-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  transform-origin: top center;
-}
-
-/* Slow drifting gradient blobs for the home backdrop. */
-@keyframes drift {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(18px, -22px) scale(1.08);
-  }
-}
-.drift {
-  animation: drift 18s ease-in-out infinite;
-}
-.drift-slow {
-  animation: drift 26s ease-in-out infinite;
+  animation: confirm 1200ms ease both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .liquid-in,
-  .liquid-in::after,
-  .rise-in,
-  .pop-in,
-  .drift,
-  .drift-slow {
+  .appear,
+  .pop-in {
     animation: none !important;
   }
 }
 
-/* Quiet, modern scrollbar for the task list. */
+/* Quiet scrollbar for the task list. */
 .tidy-scroll {
   scrollbar-width: thin;
   scrollbar-color: rgb(0 0 0 / 0.18) transparent;

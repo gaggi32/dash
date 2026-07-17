@@ -60,7 +60,7 @@ export default function TaskComposer() {
           e.preventDefault();
           void add();
         }}
-        className="flex items-center gap-2 rounded-2xl border border-black/5 bg-white/70 p-2 pl-3.5 shadow-sm backdrop-blur transition-colors focus-within:border-indigo-400/40 focus-within:ring-4 focus-within:ring-indigo-500/10 dark:border-white/10 dark:bg-white/5"
+        className="surface flex items-center gap-2 rounded-xl p-2 pl-3.5 transition-colors focus-within:border-blue-500 dark:focus-within:border-blue-500"
       >
         <PlusIcon className="shrink-0 text-[18px] text-neutral-400" />
         <input
@@ -75,10 +75,10 @@ export default function TaskComposer() {
           type="button"
           onClick={() => setCalOpen((v) => !v)}
           className={[
-            "inline-flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-[13px] font-medium transition-all",
+            "inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors",
             due
-              ? "bg-indigo-500/10 text-indigo-600 ring-1 ring-indigo-500/20 dark:bg-indigo-400/15 dark:text-indigo-300"
-              : "text-neutral-500 hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10",
+              ? "accent-soft"
+              : "text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800",
           ].join(" ")}
         >
           <CalendarIcon className="text-[15px]" />
@@ -88,7 +88,7 @@ export default function TaskComposer() {
         <button
           type="submit"
           disabled={!title.trim()}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 px-4 py-2 text-[13px] font-semibold text-white shadow-md shadow-indigo-500/25 transition-all enabled:hover:-translate-y-px disabled:from-neutral-300 disabled:to-neutral-300 disabled:text-neutral-500 disabled:shadow-none dark:disabled:from-white/10 dark:disabled:to-white/10 dark:disabled:text-neutral-500"
+          className="accent accent-hover inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-medium transition-colors disabled:from-neutral-200 disabled:to-neutral-200 disabled:text-neutral-400 disabled:shadow-none disabled:ring-0 dark:disabled:from-neutral-800 dark:disabled:to-neutral-800 dark:disabled:text-neutral-600"
         >
           Add
         </button>

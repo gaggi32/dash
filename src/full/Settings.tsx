@@ -114,12 +114,12 @@ export default function Settings() {
   );
 
   return (
-    <div className="space-y-5 rounded-2xl border border-black/5 bg-white/70 p-5 text-sm shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">
+    <div className="surface space-y-5 rounded-xl p-5 text-sm">
       <div>
         <div className="mb-2 flex items-center justify-between">
           <label className="font-semibold tracking-tight">Global hotkey</label>
           {status && (
-            <span className="text-xs font-medium text-indigo-600 dark:text-indigo-300">
+            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
               {status}
             </span>
           )}
@@ -133,17 +133,17 @@ export default function Settings() {
             if (recording) cancelRecording();
           }}
           className={[
-            "group flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all",
+            "group flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors",
             recording
-              ? "border-indigo-400/60 bg-indigo-500/5 ring-4 ring-indigo-500/10"
-              : "border-black/5 bg-black/[0.025] hover:border-black/10 hover:bg-black/[0.04] dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.07]",
+              ? "accent-soft border-blue-500 dark:border-blue-500"
+              : "border-neutral-200 bg-gradient-to-b from-neutral-50 to-neutral-100/60 hover:border-blue-400/60 dark:border-neutral-700 dark:from-neutral-800/50 dark:to-neutral-800/20 dark:hover:border-blue-500/40",
           ].join(" ")}
         >
           <KeyboardIcon
             className={[
               "text-[20px] transition-colors",
               recording
-                ? "text-indigo-500"
+                ? "text-blue-600 dark:text-blue-400"
                 : "text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-300",
             ].join(" ")}
           />
@@ -157,7 +157,7 @@ export default function Settings() {
               keys.map((k, i) => (
                 <kbd
                   key={`${k}-${i}`}
-                  className="min-w-[26px] rounded-md border border-black/10 bg-white px-2 py-1 text-center font-sans text-[12px] font-semibold text-neutral-700 shadow-sm dark:border-white/10 dark:bg-neutral-800 dark:text-neutral-200"
+                  className="min-w-[26px] rounded border border-neutral-200 bg-white px-2 py-1 text-center font-sans text-[12px] font-semibold text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
                 >
                   {k}
                 </kbd>
@@ -167,10 +167,10 @@ export default function Settings() {
 
           <span
             className={[
-              "shrink-0 rounded-lg px-2.5 py-1 text-[12px] font-medium transition-colors",
+              "shrink-0 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
               recording
-                ? "bg-indigo-500 text-white"
-                : "bg-black/5 text-neutral-500 group-hover:bg-black/10 dark:bg-white/10 dark:text-neutral-300",
+                ? "accent"
+                : "bg-neutral-100 text-neutral-500 group-hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:group-hover:bg-neutral-700",
             ].join(" ")}
           >
             {recording ? "Listening" : "Rebind"}
@@ -187,7 +187,7 @@ export default function Settings() {
             <button
               type="button"
               onClick={() => void apply(DEFAULT_HOTKEY)}
-              className="text-xs font-medium text-neutral-500 hover:text-indigo-600 dark:hover:text-indigo-400"
+              className="text-xs font-medium text-neutral-500 underline-offset-2 transition-colors hover:text-neutral-900 hover:underline dark:hover:text-neutral-100"
             >
               Reset to default
             </button>
@@ -195,7 +195,7 @@ export default function Settings() {
         </div>
       </div>
 
-      <div className="h-px bg-black/5 dark:bg-white/10" />
+      <div className="h-px bg-neutral-200 dark:bg-neutral-800" />
 
       <label className="flex cursor-pointer items-center gap-3">
         <span className="relative inline-flex">
@@ -205,7 +205,7 @@ export default function Settings() {
             onChange={(e) => void toggleAutostart(e.target.checked)}
             className="peer sr-only"
           />
-          <span className="h-6 w-10 rounded-full bg-black/15 transition-colors peer-checked:bg-indigo-500 dark:bg-white/15" />
+          <span className="h-6 w-10 rounded-full bg-neutral-300 ring-1 ring-inset ring-black/[0.06] transition-colors peer-checked:bg-gradient-to-b peer-checked:from-blue-500 peer-checked:to-indigo-600 dark:bg-neutral-700 dark:ring-white/5" />
           <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
         </span>
         <span>
