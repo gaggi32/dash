@@ -30,7 +30,7 @@
         "title": "Quick Add",
         "url": "quick.html",
         "width": 440,
-        "height": 204,
+        "height": 168,
         "resizable": false,
         "decorations": false,
         "transparent": true,
