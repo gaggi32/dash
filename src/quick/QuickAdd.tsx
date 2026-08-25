@@ -1,44 +1,75 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import {
+  currentMonitor,
+  getCurrentWindow,
+  LogicalSize,
+  PhysicalPosition,
+} from "@tauri-apps/api/window";
 import Calendar from "../components/Calendar";
+import { FolderSelect, folderLabel } from "../components/FolderPicker";
 import {
   CalendarIcon,
+  FolderIcon,
   HomeIcon,
   ArrowRightIcon,
   CheckIcon,
 } from "../components/icons";
-import { createTask } from "../lib/db";
+import { createTask, listFolders, reopen } from "../lib/db";
+import { onDbChanged, onTasksChanged } from "../lib/events";
 import { formatDue } from "../lib/date";
+import type { Folder } from "../lib/types";
 
-// Default (collapsed) and expanded sizes. Must match the `quick` window size in
-// tauri.conf.json so the first paint isn't resized. Expanded fits the calendar.
+/** Which inline panel is open below the composer, if any. */
+type Panel = "date" | "folder" | null;
+
+// Collapsed size must match the `quick` window in tauri.conf.json so the first
+// paint isn't resized. The others are tall enough for the panel they open.
 const COMPACT = new LogicalSize(440, 168);
-const EXPANDED = new LogicalSize(440, 476);
+const WITH_DATE = new LogicalSize(440, 476);
+const WITH_FOLDER = new LogicalSize(440, 396);
+
+function sizeFor(panel: Panel): LogicalSize {
+  if (panel === "date") return WITH_DATE;
+  if (panel === "folder") return WITH_FOLDER;
+  return COMPACT;
+}
 
 export default function QuickAdd() {
   const win = getCurrentWindow();
   const [title, setTitle] = useState("");
   const [due, setDue] = useState<string | null>(null);
-  const [calOpen, setCalOpen] = useState(false);
+  const [folder, setFolder] = useState<number | null>(null);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [panel, setPanel] = useState<Panel>(null);
   // Bumped each time the window is shown so the liquid entrance replays.
   const [appear, setAppear] = useState(0);
   // Bumped on each save to flash a brief "Added ✓" confirmation.
   const [added, setAdded] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Original top edge, remembered only when expanding had to lift the window
+  // off the bottom of the screen so collapsing can put it back.
+  const liftedFrom = useRef<number | null>(null);
 
   const focusInput = () =>
     requestAnimationFrame(() => inputRef.current?.focus());
 
+  const loadFolders = useCallback(() => {
+    listFolders()
+      .then(setFolders)
+      .catch((err) => console.error("Failed to load folders:", err));
+  }, []);
+
   const reset = useCallback(() => {
     setTitle("");
     setDue(null);
-    setCalOpen(false);
+    setFolder(null);
+    setPanel(null);
   }, []);
 
   const hide = useCallback(async () => {
-    setCalOpen(false);
+    setPanel(null);
     await win.setSize(COMPACT);
     await win.hide();
   }, [win]);
@@ -46,40 +77,89 @@ export default function QuickAdd() {
   // Auto-focus on first mount.
   useEffect(() => {
     focusInput();
-  }, []);
+    loadFolders();
+  }, [loadFolders]);
 
   // Rust emits `quick-focus` each time it shows the window via the hotkey/tray.
   // Reset the form, replay the entrance animation, and refocus the input.
   useEffect(() => {
     const un = listen("quick-focus", () => {
       reset();
+      loadFolders();
       setAppear((n) => n + 1);
       focusInput();
     });
     return () => {
       un.then((f) => f());
     };
-  }, [reset]);
+  }, [reset, loadFolders]);
 
-  // Escape hides the window (does not quit the app).
+  // Folders created in the main window should show up here too.
+  useEffect(() => {
+    const un = onTasksChanged(loadFolders);
+    return () => {
+      un.then((f) => f());
+    };
+  }, [loadFolders]);
+
+  // Account linking toggled: this window's handle points at the old file.
+  useEffect(() => {
+    const un = onDbChanged(() => {
+      reopen();
+      setFolder(null);
+      loadFolders();
+    });
+    return () => {
+      un.then((f) => f());
+    };
+  }, [loadFolders]);
+
+  // Escape closes an open panel first, then hides the window (never quits).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        void hide();
-      }
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      if (panel) setPanel(null);
+      else void hide();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [hide]);
+  }, [hide, panel]);
 
-  // Grow/shrink the window to fit the calendar, then re-center.
+  // Grow/shrink the window to fit the open panel. The window is anchored by its
+  // top-left corner, so resizing alone unfolds the panel downwards; re-centring
+  // afterwards (as this used to) grew it up and down at once and made the whole
+  // panel jump. The position is only touched when the taller panel would run off
+  // the bottom of the screen — then it lifts just enough to fit, and drops back
+  // to where it was once the panel closes.
   useEffect(() => {
     void (async () => {
-      await win.setSize(calOpen ? EXPANDED : COMPACT);
-      await win.center();
+      const size = sizeFor(panel);
+
+      if (panel) {
+        const pos = await win.outerPosition();
+        await win.setSize(size);
+        const mon = await currentMonitor();
+        if (!mon) return;
+        const workTop = mon.workArea.position.y;
+        const workBottom = workTop + mon.workArea.size.height;
+        const overflow = pos.y + size.height * mon.scaleFactor - workBottom;
+        if (overflow > 0) {
+          if (liftedFrom.current === null) liftedFrom.current = pos.y;
+          const y = Math.max(workTop, pos.y - Math.ceil(overflow));
+          await win.setPosition(new PhysicalPosition(pos.x, y));
+        }
+        return;
+      }
+
+      await win.setSize(size);
+      const y = liftedFrom.current;
+      if (y === null) return;
+      liftedFrom.current = null;
+      const pos = await win.outerPosition();
+      await win.setPosition(new PhysicalPosition(pos.x, y));
     })();
-  }, [calOpen, win]);
+  }, [panel, win]);
 
   // Hide the confirmation again a moment after it appears.
   useEffect(() => {
@@ -95,28 +175,33 @@ export default function QuickAdd() {
       return;
     }
     try {
-      await createTask({ title: t, dueDate: due });
+      await createTask({ title: t, dueDate: due, folderId: folder });
     } catch (err) {
       console.error("Failed to save task:", err);
       return;
     }
     // Keep the window open so several tasks can be captured in a row; just
     // clear the form, confirm the save, and refocus. Esc / click-away dismiss.
-    reset();
+    // The folder sticks so a run of tasks all land in the same place.
+    setTitle("");
+    setDue(null);
+    setPanel(null);
     setAdded((n) => n + 1);
     focusInput();
-  }, [title, due, reset]);
+  }, [title, due, folder]);
 
   const goHome = useCallback(async () => {
     await invoke("open_main");
     await hide();
   }, [hide]);
 
+  const toggle = (next: Panel) => setPanel((p) => (p === next ? null : next));
+
   return (
     <div className="flex h-screen w-screen items-start justify-center p-2.5">
       <div
         key={appear}
-        className="liquid-in w-full overflow-hidden rounded-[24px] border border-white/60 bg-white/80 shadow-[0_24px_60px_-12px_rgba(31,38,135,0.35)] ring-1 ring-black/5 backdrop-blur-2xl dark:border-white/10 dark:bg-neutral-900/75 dark:ring-white/5"
+        className="liquid-in w-full overflow-hidden rounded-[24px] border border-white/60 bg-white/80 shadow-[0_24px_60px_-12px_rgba(23,23,23,0.30)] ring-1 ring-black/5 backdrop-blur-2xl dark:border-white/10 dark:bg-neutral-900/75 dark:ring-white/5"
       >
         {/* Subtle top sheen so the glass reads as a real surface. */}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent dark:via-white/20" />
@@ -134,22 +219,38 @@ export default function QuickAdd() {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="What needs doing?"
             autoFocus
-            className="w-full rounded-2xl border border-black/5 bg-black/[0.035] px-4 py-3 text-[15px] font-medium tracking-tight text-neutral-900 outline-none transition-all placeholder:font-normal placeholder:text-neutral-400 focus:border-indigo-400/40 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 dark:border-white/5 dark:bg-white/[0.06] dark:text-neutral-50 dark:focus:bg-white/[0.09] dark:focus:ring-indigo-400/15"
+            className="w-full rounded-2xl border border-black/5 bg-black/[0.035] px-4 py-3 text-[15px] font-medium tracking-tight text-neutral-900 outline-none transition-all placeholder:font-normal placeholder:text-neutral-400 focus:border-neutral-400/50 focus:bg-white focus:ring-4 focus:ring-neutral-900/[0.06] dark:border-white/5 dark:bg-white/[0.06] dark:text-neutral-50 dark:focus:bg-white/[0.09] dark:focus:ring-white/10"
           />
 
-          <div className="mt-2.5 flex items-center gap-2">
+          <div className="mt-2.5 flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setCalOpen((v) => !v)}
+              onClick={() => toggle("date")}
               className={[
                 "inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-medium transition-all",
                 due
-                  ? "bg-indigo-500/10 text-indigo-600 ring-1 ring-indigo-500/20 dark:bg-indigo-400/15 dark:text-indigo-300"
+                  ? "bg-neutral-900/[0.06] text-neutral-700 ring-1 ring-neutral-900/10 dark:bg-white/10 dark:text-neutral-200 dark:ring-white/15"
                   : "text-neutral-500 hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10",
               ].join(" ")}
             >
               <CalendarIcon className="text-[15px]" />
               {due ? formatDue(due) : "Add date"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => toggle("folder")}
+              className={[
+                "inline-flex max-w-[130px] items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-medium transition-all",
+                folder !== null
+                  ? "bg-neutral-900/[0.06] text-neutral-700 ring-1 ring-neutral-900/10 dark:bg-white/10 dark:text-neutral-200 dark:ring-white/15"
+                  : "text-neutral-500 hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10",
+              ].join(" ")}
+            >
+              <FolderIcon className="shrink-0 text-[15px]" />
+              <span className="truncate">
+                {folder === null ? "Folder" : folderLabel(folders, folder)}
+              </span>
             </button>
 
             {added > 0 && (
@@ -167,15 +268,14 @@ export default function QuickAdd() {
                 type="button"
                 onClick={() => void goHome()}
                 title="Open full app"
-                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-medium text-neutral-500 transition-colors hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10"
+                className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-2 text-[13px] font-medium text-neutral-500 transition-colors hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10"
               >
                 <HomeIcon className="text-[15px]" />
-                Home
               </button>
               <button
                 type="submit"
                 disabled={!title.trim()}
-                className="group inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 px-4 py-2 text-[13px] font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 enabled:hover:-translate-y-px disabled:from-neutral-300 disabled:to-neutral-300 disabled:text-neutral-500 disabled:shadow-none dark:disabled:from-white/10 dark:disabled:to-white/10 dark:disabled:text-neutral-500"
+                className="group inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-neutral-700 to-neutral-900 px-4 py-2 text-[13px] font-semibold text-white shadow-lg shadow-neutral-900/25 transition-all hover:shadow-neutral-900/40 enabled:hover:-translate-y-px disabled:from-neutral-300 disabled:to-neutral-300 disabled:text-neutral-500 disabled:shadow-none dark:from-neutral-500 dark:to-neutral-700 dark:shadow-black/40 dark:disabled:from-white/10 dark:disabled:to-white/10 dark:disabled:text-neutral-500"
               >
                 Add
                 <ArrowRightIcon className="text-[15px] transition-transform group-enabled:group-hover:translate-x-0.5" />
@@ -183,13 +283,27 @@ export default function QuickAdd() {
             </div>
           </div>
 
-          {calOpen && (
+          {panel === "date" && (
             <div className="pop-in mt-2.5">
               <Calendar
                 value={due}
                 onChange={(v) => {
                   setDue(v);
-                  setCalOpen(false);
+                  setPanel(null);
+                  focusInput();
+                }}
+              />
+            </div>
+          )}
+
+          {panel === "folder" && (
+            <div className="pop-in mt-2.5">
+              <FolderSelect
+                folders={folders}
+                value={folder}
+                onChange={(id) => {
+                  setFolder(id);
+                  setPanel(null);
                   focusInput();
                 }}
               />

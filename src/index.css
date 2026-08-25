@@ -11,10 +11,10 @@
  * accent and outline in both windows stays in step.
  * ------------------------------------------------------------------------- */
 @layer components {
-  /* Window backdrop: a barely-there wash from white into the accent hue. */
+  /* Window backdrop: a barely-there wash from white down into cool grey. */
   .app-bg {
-    @apply bg-gradient-to-b from-white via-neutral-50 to-blue-50;
-    @apply dark:from-neutral-950 dark:via-neutral-950 dark:to-blue-950/40;
+    @apply bg-gradient-to-b from-white via-neutral-50 to-neutral-200/60;
+    @apply dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900;
   }
 
   /* Cards, inputs, popovers. The inset ring reads as a light catch along the
@@ -24,19 +24,22 @@
     @apply dark:border-neutral-700/80 dark:bg-neutral-900/85 dark:shadow-black/20 dark:ring-white/5;
   }
 
-  /* Filled accent: buttons, the logo mark, the active filter pill. */
+  /* Filled accent: buttons, the logo mark, the active filter pill. Graphite in
+     light mode; lifted to a mid grey on dark so it still reads as a raised
+     control against the near-black backdrop. */
   .accent {
-    @apply bg-gradient-to-b from-blue-500 to-indigo-600 text-white shadow-sm shadow-blue-600/25 ring-1 ring-inset ring-white/20;
-    @apply dark:from-blue-500 dark:to-indigo-600 dark:shadow-blue-950/40;
+    @apply bg-gradient-to-b from-neutral-700 to-neutral-900 text-white shadow-sm shadow-neutral-950/20 ring-1 ring-inset ring-white/15;
+    @apply dark:from-neutral-500 dark:to-neutral-700 dark:shadow-black/40 dark:ring-white/10;
   }
   .accent-hover {
-    @apply enabled:hover:from-blue-400 enabled:hover:to-indigo-500;
+    @apply enabled:hover:from-neutral-600 enabled:hover:to-neutral-800;
+    @apply dark:enabled:hover:from-neutral-400 dark:enabled:hover:to-neutral-600;
   }
 
   /* Tinted accent: date chips and the empty-state glyph. */
   .accent-soft {
-    @apply bg-gradient-to-b from-blue-50 to-indigo-50 text-blue-700 ring-1 ring-inset ring-blue-500/10;
-    @apply dark:from-blue-500/10 dark:to-indigo-500/10 dark:text-blue-300 dark:ring-blue-400/20;
+    @apply bg-gradient-to-b from-neutral-100 to-neutral-200/80 text-neutral-700 ring-1 ring-inset ring-neutral-900/10;
+    @apply dark:from-white/10 dark:to-white/5 dark:text-neutral-200 dark:ring-white/15;
   }
 }
 

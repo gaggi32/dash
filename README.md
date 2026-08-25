@@ -51,7 +51,8 @@ Dash/
 ├─ package.json
 ├─ vite.config.ts           # Multi-page build (main + quick)
 ├─ tailwind.config.js / postcss.config.js
-├─ app-icon.png             # Source icon for `tauri icon`
+├─ app-icon.png             # 1024px raster source for `tauri icon`
+├─ public/icon.svg          # Vector source for the icon + favicon
 ├─ src/
 │  ├─ main.tsx              # Mounts <App/>  (full window)
 │  ├─ quick.tsx             # Mounts <QuickAdd/> (quick window)
@@ -63,7 +64,8 @@ Dash/
 │  │  ├─ date.ts            # YYYY-MM-DD helpers
 │  │  └─ shortcut.ts        # Hotkey get/set/persist
 │  ├─ components/
-│  │  └─ Calendar.tsx       # Compact, dependency-free month calendar
+│  │  ├─ Calendar.tsx       # Compact, dependency-free month calendar
+│  │  └─ DashMark.tsx       # Brand mark, same geometry as the app icon
 │  ├─ quick/
 │  │  └─ QuickAdd.tsx       # Quick-add window UI + toggle/resize logic
 │  └─ full/
@@ -107,7 +109,9 @@ Dash/
 ```bash
 npm install
 
-# (Re)generate icons from the source PNG if needed:
+# (Re)generate icons from the source PNG if needed. Tauri also writes
+# iOS/Android/Store assets this desktop-only app doesn't ship — delete
+# anything outside the five files listed in tauri.conf.json:
 npm run tauri icon ./app-icon.png
 
 # Run the full app (Rust + Vite dev server, hot reload):

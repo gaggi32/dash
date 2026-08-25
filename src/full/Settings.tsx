@@ -9,7 +9,8 @@ import {
   setHotkey,
   suspendHotkey,
 } from "../lib/shortcut";
-import { KeyboardIcon } from "../components/icons";
+import { KeyboardIcon, UsersIcon } from "../components/icons";
+import { isLinked, setLinked, sharingSupported } from "../lib/link";
 
 export default function Settings() {
   const [hotkey, setHotkeyValue] = useState(getHotkey());
@@ -18,6 +19,12 @@ export default function Settings() {
   const [preview, setPreview] = useState<string>("");
   const [status, setStatus] = useState<string | null>(null);
   const [autostart, setAutostart] = useState(false);
+  // Account linking: whether this platform offers it, whether it's on, and a
+  // line of feedback after the merge that runs on first link.
+  const [sharing, setSharing] = useState(false);
+  const [linked, setLinkedState] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const [linkNote, setLinkNote] = useState<string | null>(null);
   const recorderRef = useRef<HTMLButtonElement>(null);
   // Tracks whether a recording is in progress so we can restore the previous
   // hotkey if the panel closes mid-record (but never after a real commit).
@@ -27,6 +34,13 @@ export default function Settings() {
     isEnabled()
       .then(setAutostart)
       .catch((e) => console.error("autostart isEnabled failed:", e));
+
+    sharingSupported()
+      .then(setSharing)
+      .catch(() => setSharing(false));
+    isLinked()
+      .then(setLinkedState)
+      .catch(() => setLinkedState(false));
 
     // Safety net: if Settings unmounts while still listening, give the old
     // hotkey back so the user is never left without a working shortcut.
@@ -99,6 +113,29 @@ export default function Settings() {
     recorderRef.current?.focus();
   };
 
+  // Linking copies this account's tasks into the shared database, which can
+  // take a moment on a long list, so the toggle stays disabled until it lands.
+  const toggleLink = async (next: boolean) => {
+    setLinking(true);
+    setLinkNote(null);
+    try {
+      const copied = await setLinked(next);
+      setLinkedState(next);
+      setLinkNote(
+        next
+          ? copied > 0
+            ? `Shared. Copied ${copied} task${copied === 1 ? "" : "s"} across.`
+            : "Shared. Nothing new to copy."
+          : "Unshared. Anything added while shared stays with the other account.",
+      );
+    } catch (err) {
+      console.error("Failed to change sharing:", err);
+      setLinkNote(`Couldn't change sharing: ${String(err)}`);
+    } finally {
+      setLinking(false);
+    }
+  };
+
   const toggleAutostart = async (next: boolean) => {
     try {
       if (next) await enable();
@@ -119,7 +156,7 @@ export default function Settings() {
         <div className="mb-2 flex items-center justify-between">
           <label className="font-semibold tracking-tight">Global hotkey</label>
           {status && (
-            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+            <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200">
               {status}
             </span>
           )}
@@ -135,15 +172,15 @@ export default function Settings() {
           className={[
             "group flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors",
             recording
-              ? "accent-soft border-blue-500 dark:border-blue-500"
-              : "border-neutral-200 bg-gradient-to-b from-neutral-50 to-neutral-100/60 hover:border-blue-400/60 dark:border-neutral-700 dark:from-neutral-800/50 dark:to-neutral-800/20 dark:hover:border-blue-500/40",
+              ? "accent-soft border-neutral-500 dark:border-neutral-400"
+              : "border-neutral-200 bg-gradient-to-b from-neutral-50 to-neutral-100/60 hover:border-neutral-400/70 dark:border-neutral-700 dark:from-neutral-800/50 dark:to-neutral-800/20 dark:hover:border-neutral-500/50",
           ].join(" ")}
         >
           <KeyboardIcon
             className={[
               "text-[20px] transition-colors",
               recording
-                ? "text-blue-600 dark:text-blue-400"
+                ? "text-neutral-700 dark:text-neutral-200"
                 : "text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-300",
             ].join(" ")}
           />
@@ -205,7 +242,7 @@ export default function Settings() {
             onChange={(e) => void toggleAutostart(e.target.checked)}
             className="peer sr-only"
           />
-          <span className="h-6 w-10 rounded-full bg-neutral-300 ring-1 ring-inset ring-black/[0.06] transition-colors peer-checked:bg-gradient-to-b peer-checked:from-blue-500 peer-checked:to-indigo-600 dark:bg-neutral-700 dark:ring-white/5" />
+          <span className="h-6 w-10 rounded-full bg-neutral-300 ring-1 ring-inset ring-black/[0.06] transition-colors peer-checked:bg-gradient-to-b peer-checked:from-neutral-700 peer-checked:to-neutral-900 dark:bg-neutral-700 dark:ring-white/5 dark:peer-checked:from-neutral-300 dark:peer-checked:to-neutral-500" />
           <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
         </span>
         <span>
@@ -215,6 +252,46 @@ export default function Settings() {
           </span>
         </span>
       </label>
+
+      {sharing && (
+        <>
+          <div className="h-px bg-neutral-200 dark:bg-neutral-800" />
+
+          <div>
+            <label className="flex cursor-pointer items-start gap-3">
+              <span className="relative mt-0.5 inline-flex">
+                <input
+                  type="checkbox"
+                  checked={linked}
+                  disabled={linking}
+                  onChange={(e) => void toggleLink(e.target.checked)}
+                  className="peer sr-only"
+                />
+                <span className="h-6 w-10 rounded-full bg-neutral-300 ring-1 ring-inset ring-black/[0.06] transition-colors peer-checked:bg-gradient-to-b peer-checked:from-neutral-700 peer-checked:to-neutral-900 peer-disabled:opacity-50 dark:bg-neutral-700 dark:ring-white/5 dark:peer-checked:from-neutral-300 dark:peer-checked:to-neutral-500" />
+                <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <UsersIcon className="text-[15px] text-neutral-400" />
+                  Share with other Windows accounts
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
+                  Moves this account onto one shared task list in the PC&apos;s
+                  Public folder, and copies your current tasks into it. Turn it
+                  on in each Windows account you want to share with.
+                </span>
+              </span>
+            </label>
+
+            <p className="mt-2 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
+              {linkNote ??
+                (linked
+                  ? "Changes from the other account appear within a few seconds while both are signed in."
+                  : "Your tasks stay private to this Windows account.")}
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 }

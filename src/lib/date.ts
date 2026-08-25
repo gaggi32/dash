@@ -16,6 +16,13 @@ export function todayISO(): string {
   return toISODate(new Date());
 }
 
+/** ISO date `days` days from today (negative goes backwards). */
+export function daysFromTodayISO(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return toISODate(d);
+}
+
 export function sameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&

@@ -1,20 +1,41 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Calendar from "../components/Calendar";
+import FolderPicker from "../components/FolderPicker";
 import { CalendarIcon, PlusIcon } from "../components/icons";
 import { createTask } from "../lib/db";
 import { formatDue } from "../lib/date";
+import type { Folder, FolderScope } from "../lib/types";
+
+interface Props {
+  folders: Folder[];
+  /** The sidebar selection, which seeds the folder a new task lands in. */
+  scope: FolderScope;
+}
 
 /**
  * Inline "add a task" composer for the full window, so tasks can be created
  * from home without opening the quick-add overlay. Writes go through the same
  * `createTask`, which broadcasts `tasks-changed`, so the list refreshes itself.
  */
-export default function TaskComposer() {
+export default function TaskComposer({ folders, scope }: Props) {
   const [title, setTitle] = useState("");
   const [due, setDue] = useState<string | null>(null);
   const [calOpen, setCalOpen] = useState(false);
+  // Explicit folder choice for this one task. Null means "follow the sidebar",
+  // so switching folders re-targets the composer without extra clicks.
+  const [folder, setFolder] = useState<number | null>(null);
+  const [folderTouched, setFolderTouched] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const scopeFolder = typeof scope === "number" ? scope : null;
+  const target = folderTouched ? folder : scopeFolder;
+
+  // A new sidebar selection overrides a stale per-task override.
+  useEffect(() => {
+    setFolderTouched(false);
+    setFolder(null);
+  }, [scope]);
 
   // Close the date popover on outside click / Escape.
   useEffect(() => {
@@ -42,7 +63,7 @@ export default function TaskComposer() {
       return;
     }
     try {
-      await createTask({ title: t, dueDate: due });
+      await createTask({ title: t, dueDate: due, folderId: target });
     } catch (err) {
       console.error("Failed to save task:", err);
       return;
@@ -51,16 +72,19 @@ export default function TaskComposer() {
     setDue(null);
     setCalOpen(false);
     inputRef.current?.focus();
-  }, [title, due]);
+  }, [title, due, target]);
 
+  // `.surface` sets backdrop-blur, which makes the form its own stacking
+  // context — the folder popover nested inside it can't out-stack the task
+  // list on its own, so the whole composer is lifted above the list instead.
   return (
-    <div ref={wrapRef} className="relative">
+    <div ref={wrapRef} className="relative z-20">
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void add();
         }}
-        className="surface flex items-center gap-2 rounded-xl p-2 pl-3.5 transition-colors focus-within:border-blue-500 dark:focus-within:border-blue-500"
+        className="surface flex items-center gap-2 rounded-xl p-2 pl-3.5 transition-colors focus-within:border-neutral-500 dark:focus-within:border-neutral-400"
       >
         <PlusIcon className="shrink-0 text-[18px] text-neutral-400" />
         <input
@@ -69,6 +93,15 @@ export default function TaskComposer() {
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Add a task…"
           className="min-w-0 flex-1 bg-transparent py-1.5 text-[15px] font-medium tracking-tight text-neutral-900 outline-none placeholder:font-normal placeholder:text-neutral-400 dark:text-neutral-50"
+        />
+
+        <FolderPicker
+          folders={folders}
+          value={target}
+          onChange={(id) => {
+            setFolder(id);
+            setFolderTouched(true);
+          }}
         />
 
         <button

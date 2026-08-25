@@ -7,7 +7,7 @@ interface Props {
   onChange: (value: string | null) => void;
 }
 
-const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -29,7 +29,7 @@ export default function Calendar({ value, onChange }: Props) {
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
 
-  const firstWeekday = new Date(year, month, 1).getDay();
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const cells: (Date | null)[] = [];
@@ -86,7 +86,7 @@ export default function Calendar({ value, onChange }: Props) {
                   ? "accent font-medium"
                   : "hover:bg-neutral-100 dark:hover:bg-neutral-800",
                 !isSelected && isToday
-                  ? "font-semibold text-blue-600 ring-1 ring-inset ring-blue-300 dark:text-blue-400 dark:ring-blue-500/40"
+                  ? "font-semibold text-neutral-900 ring-1 ring-inset ring-neutral-300 dark:text-neutral-100 dark:ring-neutral-600"
                   : "",
               ].join(" ")}
             >
@@ -100,7 +100,7 @@ export default function Calendar({ value, onChange }: Props) {
         <button
           type="button"
           onClick={() => onChange(toISODate(new Date()))}
-          className="rounded-md px-2.5 py-1 font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-500/10"
+          className="rounded-md px-2.5 py-1 font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
         >
           Today
         </button>

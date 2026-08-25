@@ -2,14 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { CheckIcon, ChevronDown, SortIcon } from "../components/icons";
 import type { SortKey } from "../lib/types";
 
-const OPTIONS: { key: SortKey; label: string }[] = [
+/** What this dropdown can select: either a sort order, or the "next week" view. */
+export type ViewKey = SortKey | "nextWeek";
+
+const OPTIONS: { key: ViewKey; label: string }[] = [
   { key: "created", label: "Newest" },
   { key: "due", label: "Due date" },
+  { key: "nextWeek", label: "Next week" },
 ];
 
 interface Props {
-  value: SortKey;
-  onChange: (value: SortKey) => void;
+  value: ViewKey;
+  onChange: (value: ViewKey) => void;
 }
 
 /**
@@ -42,7 +46,7 @@ export default function SortMenu({ value, onChange }: Props) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="surface inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-neutral-600 transition-colors hover:border-blue-400/60 hover:text-neutral-900 focus:border-blue-500 focus:outline-none dark:text-neutral-300 dark:hover:border-blue-500/40 dark:hover:text-neutral-100"
+        className="surface inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-neutral-600 transition-colors hover:border-neutral-400/70 hover:text-neutral-900 focus:border-neutral-500 focus:outline-none dark:text-neutral-300 dark:hover:border-neutral-500/50 dark:hover:text-neutral-100"
       >
         <SortIcon className="text-[15px] text-neutral-400" />
         {current.label}

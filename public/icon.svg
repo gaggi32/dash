@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Dash">
+  <title>Dash</title>
+  <defs>
+    <!-- CSS `linear-gradient(160deg, #1c1c1f, #0e0e10)` as gradient-line endpoints. -->
+    <linearGradient id="tile" gradientUnits="userSpaceOnUse" x1="71.9" y1="-26.2" x2="184.1" y2="282.2">
+      <stop offset="0" stop-color="#1c1c1f"/>
+      <stop offset="1" stop-color="#0e0e10"/>
+    </linearGradient>
+    <!-- Light catch along the top edge; fades out before it wraps the sides. -->
+    <linearGradient id="edge" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="110">
+      <stop offset="0" stop-color="#fff" stop-opacity=".10"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="58" fill="url(#tile)"/>
+  <rect x=".5" y=".5" width="255" height="255" rx="57.5" fill="none" stroke="url(#edge)"/>
+  <g fill="none" stroke-width="18" stroke-linecap="round">
+    <path stroke="#6a6a72" d="M92 140.6 111.8 160.4"/>
+    <path stroke="#f2f2f4" d="M122.2 149.2 164 95.6"/>
+  </g>
+</svg>

@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use tauri::{
@@ -18,6 +19,50 @@ const AUTOSTART_FLAG: &str = "--hidden";
 
 const QUICK_LABEL: &str = "quick";
 const MAIN_LABEL: &str = "main";
+
+/// Connection string for this account's private database. Resolved by
+/// tauri-plugin-sql against the per-user app data dir.
+const LOCAL_DB_URL: &str = "sqlite:dash.db";
+
+/// Marker file in the app config dir. Its mere presence means "this account is
+/// linked to the shared database" — cheaper than taking on a JSON dependency
+/// just to persist one boolean.
+const LINK_MARKER: &str = "linked";
+
+/// Directory holding the shared database, on platforms with a location every
+/// local account can write to without elevation. `None` means account linking
+/// is unavailable and the Settings toggle stays hidden.
+fn shared_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        // %PUBLIC% is C:\Users\Public, which grants Modify to every local
+        // account by default — no installer ACL work, no elevation prompt.
+        std::env::var_os("PUBLIC").map(|p| PathBuf::from(p).join("Dash"))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Some(PathBuf::from("/Users/Shared/Dash"))
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        None
+    }
+}
+
+fn shared_db_url() -> Option<String> {
+    shared_dir().map(|d| format!("sqlite:{}", d.join("dash.db").display()))
+}
+
+fn marker_path(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_config_dir()
+        .map(|d| d.join(LINK_MARKER))
+        .map_err(|e| e.to_string())
+}
+
+fn linked(app: &AppHandle) -> bool {
+    marker_path(app).map(|p| p.exists()).unwrap_or(false)
+}
 
 /// Default hotkey: ⌘⇧Space on macOS, Ctrl⇧Space everywhere else.
 fn default_shortcut() -> Shortcut {
@@ -64,6 +109,58 @@ fn hide_quick(app: AppHandle) {
 #[tauri::command]
 fn open_main(app: AppHandle) {
     show_main(&app);
+}
+
+/// Connection string the frontend should open: the shared database when this
+/// account is linked, otherwise its own private one.
+#[tauri::command]
+fn db_url(app: AppHandle) -> String {
+    if linked(&app) {
+        shared_db_url().unwrap_or_else(|| LOCAL_DB_URL.to_string())
+    } else {
+        LOCAL_DB_URL.to_string()
+    }
+}
+
+/// This account's private database, regardless of link state. The frontend
+/// opens it alongside the shared one to merge existing tasks in on first link.
+#[tauri::command]
+fn private_db_url() -> String {
+    LOCAL_DB_URL.to_string()
+}
+
+/// Whether this platform has a shared location at all.
+#[tauri::command]
+fn sharing_supported() -> bool {
+    shared_db_url().is_some()
+}
+
+#[tauri::command]
+fn is_linked(app: AppHandle) -> bool {
+    linked(&app)
+}
+
+/// Link or unlink this account, returning the connection string to use next.
+/// The shared directory is created here rather than at startup so accounts that
+/// never opt in leave nothing behind in the public folder.
+#[tauri::command]
+fn set_linked(app: AppHandle, enabled: bool) -> Result<String, String> {
+    let marker = marker_path(&app)?;
+
+    if enabled {
+        let dir = shared_dir()
+            .ok_or_else(|| "Account linking isn't supported on this platform.".to_string())?;
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| format!("Couldn't create {}: {e}", dir.display()))?;
+        if let Some(parent) = marker.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(&marker, b"").map_err(|e| e.to_string())?;
+    } else if marker.exists() {
+        std::fs::remove_file(&marker).map_err(|e| e.to_string())?;
+    }
+
+    Ok(db_url(app))
 }
 
 /// Re-register the global shortcut at runtime (used by the Settings panel).
@@ -122,14 +219,14 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-// ---- App entry -------------------------------------------------------------
+// ---- Schema ----------------------------------------------------------------
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    let migrations = vec![Migration {
-        version: 1,
-        description: "create_tasks_table",
-        sql: "CREATE TABLE IF NOT EXISTS tasks (
+fn migrations() -> Vec<Migration> {
+    vec![
+        Migration {
+            version: 1,
+            description: "create_tasks_table",
+            sql: "CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 due_date TEXT,
@@ -137,8 +234,38 @@ pub fn run() {
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             );",
-        kind: MigrationKind::Up,
-    }];
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "create_folders_table",
+            // No REFERENCES clause: SQLite leaves foreign keys off by default,
+            // so the app clears folder_id itself when a folder is deleted.
+            sql: "CREATE TABLE IF NOT EXISTS folders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            ALTER TABLE tasks ADD COLUMN folder_id INTEGER;",
+            kind: MigrationKind::Up,
+        },
+    ]
+}
+
+// ---- App entry -------------------------------------------------------------
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    // Both the private and the shared database need the same schema, and
+    // tauri-plugin-sql keys migrations by connection string, so this runs twice.
+    let sql = {
+        let mut builder =
+            tauri_plugin_sql::Builder::default().add_migrations(LOCAL_DB_URL, migrations());
+        if let Some(shared) = shared_db_url() {
+            builder = builder.add_migrations(&shared, migrations());
+        }
+        builder.build()
+    };
 
     tauri::Builder::default()
         // single-instance MUST be the first plugin registered.
@@ -146,11 +273,7 @@ pub fn run() {
             // A second launch just surfaces the existing instance.
             show_main(app);
         }))
-        .plugin(
-            tauri_plugin_sql::Builder::default()
-                .add_migrations("sqlite:dash.db", migrations)
-                .build(),
-        )
+        .plugin(sql)
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -168,7 +291,12 @@ pub fn run() {
             hide_quick,
             open_main,
             update_shortcut,
-            suspend_shortcut
+            suspend_shortcut,
+            db_url,
+            private_db_url,
+            sharing_supported,
+            is_linked,
+            set_linked
         ])
         .on_window_event(|window, event| match event {
             // Click outside / focus loss hides the quick window instantly.

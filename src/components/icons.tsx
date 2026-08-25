@@ -14,15 +14,21 @@ import {
   Calendar,
   Check,
   CheckCheck,
+  CheckSquare,
   ChevronDown as ChevronDownGlyph,
   ChevronLeft as ChevronLeftGlyph,
   ChevronRight as ChevronRightGlyph,
+  Folder,
   House,
   Inbox,
   Keyboard,
+  Layers,
+  Pencil,
   Plus,
   Settings,
   Trash2,
+  Users,
+  X,
   type LucideIcon,
   type LucideProps,
 } from "lucide-react";
@@ -48,3 +54,9 @@ export const PlusIcon = icon(Plus);
 export const InboxIcon = icon(Inbox);
 export const ArchiveIcon = icon(Archive);
 export const CheckCheckIcon = icon(CheckCheck);
+export const FolderIcon = icon(Folder);
+export const LayersIcon = icon(Layers);
+export const PencilIcon = icon(Pencil);
+export const UsersIcon = icon(Users);
+export const CheckSquareIcon = icon(CheckSquare);
+export const XIcon = icon(X);
