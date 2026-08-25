@@ -184,7 +184,30 @@ export async function setCompleted(id: number, completed: boolean): Promise<void
 
 export async function deleteTask(id: number): Promise<void> {
   const d = await db();
+  const rows = await d.select<{ title: string; due_date: string | null }[]>(
+    "SELECT title, due_date FROM tasks WHERE id = $1",
+    [id],
+  );
   await d.execute("DELETE FROM tasks WHERE id = $1", [id]);
+
+  // While linked, the active db is the shared one, but this account's private
+  // db still has its own copy of the row. Delete it there too (matched the
+  // same way mergePrivateInto de-dupes) so relinking later can't resurrect it.
+  const task = rows[0];
+  if (task) {
+    const [currentUrl, privateUrl] = await Promise.all([
+      invoke<string>("db_url"),
+      invoke<string>("private_db_url"),
+    ]);
+    if (currentUrl !== privateUrl) {
+      const priv = await open(privateUrl);
+      await priv.execute("DELETE FROM tasks WHERE title = $1 AND due_date IS $2", [
+        task.title,
+        task.due_date,
+      ]);
+    }
+  }
+
   await notifyChange();
 }
 
