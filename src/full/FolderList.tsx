@@ -17,6 +17,9 @@ interface Props {
   onCreate: (name: string) => void;
   onRename: (id: number, name: string) => void;
   onDelete: (id: number) => void;
+  /** Narrow windows show the rail as an overlay drawer; this is its open state. */
+  open: boolean;
+  onClose: () => void;
 }
 
 /**
@@ -32,6 +35,8 @@ export default function FolderList({
   onCreate,
   onRename,
   onDelete,
+  open,
+  onClose,
 }: Props) {
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState("");
@@ -43,6 +48,12 @@ export default function FolderList({
   useEffect(() => {
     if (creating) newRef.current?.focus();
   }, [creating]);
+
+  /** Picking a folder also dismisses the drawer, which covers the list. */
+  const select = (next: FolderScope) => {
+    onSelect(next);
+    onClose();
+  };
 
   const submitNew = () => {
     const name = draft.trim();
@@ -58,14 +69,24 @@ export default function FolderList({
   };
 
   return (
-    <aside className="flex w-48 shrink-0 flex-col border-r border-neutral-200/80 pb-4 dark:border-neutral-800/80">
+    <aside
+      className={[
+        "flex w-48 shrink-0 flex-col border-r border-neutral-200/80 pb-4 dark:border-neutral-800/80",
+        // Under `sm` the window is too narrow to spare 12rem permanently, so
+        // the rail lifts out of the flex row and slides in over the list.
+        "max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-40 max-sm:w-56",
+        "max-sm:bg-neutral-50 max-sm:shadow-xl max-sm:transition-transform max-sm:duration-200",
+        "max-sm:dark:bg-neutral-950",
+        open ? "max-sm:translate-x-0" : "max-sm:-translate-x-full",
+      ].join(" ")}
+    >
       <nav className="tidy-scroll min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
         <Row
           icon={<LayersIcon />}
           label="All tasks"
           count={counts.all}
           active={scope === "all"}
-          onClick={() => onSelect("all")}
+          onClick={() => select("all")}
         />
 
         {folders.map((f) =>
@@ -99,7 +120,7 @@ export default function FolderList({
               label={f.name}
               count={counts.byFolder[f.id] ?? 0}
               active={scope === f.id}
-              onClick={() => onSelect(f.id)}
+              onClick={() => select(f.id)}
               actions={
                 <>
                   <IconButton
@@ -129,7 +150,7 @@ export default function FolderList({
           label="Unfiled"
           count={counts.unfiled}
           active={scope === "unfiled"}
-          onClick={() => onSelect("unfiled")}
+          onClick={() => select("unfiled")}
         />
 
         {creating && (

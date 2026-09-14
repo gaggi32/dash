@@ -84,7 +84,7 @@ export default function TaskComposer({ folders, scope }: Props) {
           e.preventDefault();
           void add();
         }}
-        className="surface flex items-center gap-2 rounded-xl p-2 pl-3.5 transition-colors focus-within:border-neutral-500 dark:focus-within:border-neutral-400"
+        className="surface flex items-center gap-1 rounded-xl p-2 pl-3.5 transition-colors focus-within:border-neutral-500 sm:gap-2 dark:focus-within:border-neutral-400"
       >
         <PlusIcon className="shrink-0 text-[18px] text-neutral-400" />
         <input
@@ -115,13 +115,13 @@ export default function TaskComposer({ folders, scope }: Props) {
           ].join(" ")}
         >
           <CalendarIcon className="text-[15px]" />
-          <span className="hidden sm:inline">{due ? formatDue(due) : "Date"}</span>
+          <span className="hidden md:inline">{due ? formatDue(due) : "Date"}</span>
         </button>
 
         <button
           type="submit"
           disabled={!title.trim()}
-          className="accent accent-hover inline-flex shrink-0 items-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-medium transition-colors disabled:from-neutral-200 disabled:to-neutral-200 disabled:text-neutral-400 disabled:shadow-none disabled:ring-0 dark:disabled:from-neutral-800 dark:disabled:to-neutral-800 dark:disabled:text-neutral-600"
+          className="accent accent-hover inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 sm:px-4 text-[13px] font-medium transition-colors disabled:from-neutral-200 disabled:to-neutral-200 disabled:text-neutral-400 disabled:shadow-none disabled:ring-0 dark:disabled:from-neutral-800 dark:disabled:to-neutral-800 dark:disabled:text-neutral-600"
         >
           Add
         </button>

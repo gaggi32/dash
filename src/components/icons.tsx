@@ -23,6 +23,7 @@ import {
   Inbox,
   Keyboard,
   Layers,
+  Menu,
   Pencil,
   Plus,
   Settings,
@@ -56,6 +57,7 @@ export const ArchiveIcon = icon(Archive);
 export const CheckCheckIcon = icon(CheckCheck);
 export const FolderIcon = icon(Folder);
 export const LayersIcon = icon(Layers);
+export const MenuIcon = icon(Menu);
 export const PencilIcon = icon(Pencil);
 export const UsersIcon = icon(Users);
 export const CheckSquareIcon = icon(CheckSquare);

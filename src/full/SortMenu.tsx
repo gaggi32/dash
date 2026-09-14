@@ -48,11 +48,12 @@ export default function SortMenu({ value, onChange }: Props) {
         onClick={() => setOpen((v) => !v)}
         className="surface inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-neutral-600 transition-colors hover:border-neutral-400/70 hover:text-neutral-900 focus:border-neutral-500 focus:outline-none dark:text-neutral-300 dark:hover:border-neutral-500/50 dark:hover:text-neutral-100"
       >
-        <SortIcon className="text-[15px] text-neutral-400" />
-        {current.label}
+        <SortIcon className="shrink-0 text-[15px] text-neutral-400" />
+        {/* The label is the first thing to go when the window gets tight. */}
+        <span className="hidden sm:inline">{current.label}</span>
         <ChevronDown
           className={[
-            "text-[14px] text-neutral-400 transition-transform",
+            "shrink-0 text-[14px] text-neutral-400 transition-transform",
             open ? "rotate-180" : "",
           ].join(" ")}
         />

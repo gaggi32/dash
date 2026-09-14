@@ -15,6 +15,7 @@ import {
 import { onDbChanged, onTasksChanged } from "../lib/events";
 import { isLinked } from "../lib/link";
 import { applySavedHotkey } from "../lib/shortcut";
+import { applySavedStayOnTopFullscreen } from "../lib/topmost";
 import type {
   Filter,
   Folder,
@@ -32,6 +33,7 @@ import {
   ChevronLeft,
   FolderIcon,
   InboxIcon,
+  MenuIcon,
   SettingsIcon,
   XIcon,
 } from "../components/icons";
@@ -68,11 +70,12 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [counts, setCounts] = useState<FolderCounts>(NO_COUNTS);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<Filter>("active");
   const [sort, setSort] = useState<SortKey>("due");
   const [scope, setScope] = useState<FolderScope>("all");
   const [view, setView] = useState<View>("home");
   const [linked, setLinked] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const lastSelectedIndex = useRef<number | null>(null);
@@ -93,9 +96,11 @@ export default function App() {
     }
   }, [filter, sort, scope]);
 
-  // Re-apply a customised hotkey once on launch.
+  // Re-apply a customised hotkey (and the fullscreen-topmost watchdog, if
+  // enabled) once on launch.
   useEffect(() => {
     void applySavedHotkey();
+    void applySavedStayOnTopFullscreen();
     void isLinked()
       .then(setLinked)
       .catch(() => setLinked(false));
@@ -199,12 +204,24 @@ export default function App() {
 
   return (
     <div className="app-bg h-screen overflow-hidden text-neutral-900 dark:text-neutral-100">
-      <div className="mx-auto flex h-full max-w-5xl">
+      <div className="relative mx-auto flex h-full max-w-5xl">
         {view === "settings" ? (
           <SettingsView key="settings" onBack={() => setView("home")} />
         ) : (
           <>
+            {/* Scrim behind the drawer; only ever visible under `sm`. */}
+            {navOpen && (
+              <button
+                type="button"
+                aria-label="Close folders"
+                onClick={() => setNavOpen(false)}
+                className="absolute inset-0 z-30 bg-neutral-950/40 sm:hidden"
+              />
+            )}
+
             <FolderList
+              open={navOpen}
+              onClose={() => setNavOpen(false)}
               folders={folders}
               counts={counts}
               scope={scope}
@@ -214,12 +231,20 @@ export default function App() {
               onDelete={(id) => void removeFolder(id)}
             />
 
-            <div key="home" className="flex min-h-0 flex-1 flex-col">
-              <header className="flex items-center gap-3 px-6 pb-3 pt-6">
-                <DashMark className="h-9 w-9 drop-shadow-sm" />
-                <div className="leading-tight">
-                  <h1 className="text-lg font-semibold tracking-tight">Dash</h1>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            <div key="home" className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <header className="flex items-center gap-3 px-4 pb-3 pt-6 sm:px-6">
+                <button
+                  type="button"
+                  onClick={() => setNavOpen(true)}
+                  title="Folders"
+                  className="-ml-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[18px] text-neutral-500 transition-colors hover:bg-neutral-200/70 hover:text-neutral-900 sm:hidden dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+                >
+                  <MenuIcon />
+                </button>
+                <DashMark className="hidden h-9 w-9 shrink-0 drop-shadow-sm sm:block" />
+                <div className="min-w-0 leading-tight">
+                  <h1 className="truncate text-lg font-semibold tracking-tight">Dash</h1>
+                  <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">
                     {counts.all === 0
                       ? "All clear"
                       : `${counts.all} task${counts.all === 1 ? "" : "s"} to go`}
@@ -230,22 +255,22 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setView("settings")}
-                  className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg text-[18px] text-neutral-500 transition-colors hover:bg-neutral-200/70 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+                  className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[18px] text-neutral-500 transition-colors hover:bg-neutral-200/70 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
                   title="Settings"
                 >
                   <SettingsIcon />
                 </button>
               </header>
 
-              <div className="flex items-center gap-2 px-6 pb-3">
-                <div className="surface flex rounded-lg p-0.5">
+              <div className="flex items-center gap-2 px-4 pb-3 sm:px-6">
+                <div className="surface flex min-w-0 rounded-lg p-0.5">
                   {FILTERS.map((f) => (
                     <button
                       key={f.key}
                       type="button"
                       onClick={() => setFilter(f.key)}
                       className={[
-                        "rounded-[6px] px-3.5 py-1.5 text-[13px] font-medium transition-colors",
+                        "truncate rounded-[6px] px-2.5 py-1.5 text-[13px] font-medium transition-colors sm:px-3.5",
                         filter === f.key
                           ? "accent"
                           : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100",
@@ -256,7 +281,7 @@ export default function App() {
                   ))}
                 </div>
 
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex shrink-0 items-center gap-2">
                   <button
                     type="button"
                     onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
@@ -288,12 +313,12 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="px-6 pb-3">
+              <div className="px-4 pb-3 sm:px-6">
                 <TaskComposer folders={folders} scope={scope} />
               </div>
 
               {selectMode && (
-                <div className="px-6">
+                <div className="px-4 sm:px-6">
                   <SelectionBar
                     count={selectedIds.size}
                     total={tasks.length}
@@ -309,7 +334,7 @@ export default function App() {
                 </div>
               )}
 
-              <main className="tidy-scroll min-h-0 flex-1 overflow-y-auto px-6 pb-8 pt-1">
+              <main className="tidy-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-6">
                 {tasks.length === 0 ? (
                   <EmptyState filter={filter} scope={scope} />
                 ) : (
@@ -352,7 +377,7 @@ function SettingsView({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
-      <header className="flex items-center gap-3 px-6 pb-3 pt-6">
+      <header className="flex items-center gap-3 px-4 pb-3 pt-6 sm:px-6">
         <button
           type="button"
           onClick={onBack}
@@ -369,7 +394,7 @@ function SettingsView({ onBack }: { onBack: () => void }) {
         </div>
       </header>
 
-      <main className="tidy-scroll min-h-0 flex-1 overflow-y-auto px-6 pb-8 pt-2">
+      <main className="tidy-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-2 sm:px-6">
         <Settings />
       </main>
     </div>

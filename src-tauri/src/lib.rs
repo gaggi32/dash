@@ -1,5 +1,9 @@
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -19,6 +23,9 @@ const AUTOSTART_FLAG: &str = "--hidden";
 
 const QUICK_LABEL: &str = "quick";
 const MAIN_LABEL: &str = "main";
+
+/// Shared flag for the fullscreen-topmost watchdog (see [`spawn_topmost_watch`]).
+struct TopmostWatch(Arc<AtomicBool>);
 
 /// Connection string for this account's private database. Resolved by
 /// tauri-plugin-sql against the per-user app data dir.
@@ -185,6 +192,36 @@ fn suspend_shortcut(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Toggle the fullscreen-topmost watchdog. `alwaysOnTop` in tauri.conf.json
+/// asserts HWND_TOPMOST once, but a fullscreen game or video regularly steals
+/// it back when it (re)gains focus, and Windows treats a maximized borderless
+/// app as fullscreen the same way. Re-asserting on an interval — the same
+/// trick overlay apps like Discord's use — makes the panel come back on top
+/// within a beat instead of staying buried until the other app loses focus.
+#[tauri::command]
+fn set_topmost_watch(app: AppHandle, enabled: bool) -> Result<(), String> {
+    app.state::<TopmostWatch>().0.store(enabled, Ordering::Relaxed);
+    if enabled {
+        if let Some(win) = app.get_webview_window(QUICK_LABEL) {
+            win.set_always_on_top(true).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+/// Background loop backing [`set_topmost_watch`]. Sleeps between checks so it
+/// costs nothing while the setting is off.
+fn spawn_topmost_watch(app: AppHandle, flag: Arc<AtomicBool>) {
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_millis(750));
+        if flag.load(Ordering::Relaxed) {
+            if let Some(win) = app.get_webview_window(QUICK_LABEL) {
+                let _ = win.set_always_on_top(true);
+            }
+        }
+    });
+}
+
 // ---- Tray ------------------------------------------------------------------
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
@@ -287,11 +324,13 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![AUTOSTART_FLAG]),
         ))
+        .manage(TopmostWatch(Arc::new(AtomicBool::new(false))))
         .invoke_handler(tauri::generate_handler![
             hide_quick,
             open_main,
             update_shortcut,
             suspend_shortcut,
+            set_topmost_watch,
             db_url,
             private_db_url,
             sharing_supported,
@@ -325,6 +364,9 @@ pub fn run() {
             }
 
             build_tray(handle)?;
+
+            let watch_flag = app.state::<TopmostWatch>().0.clone();
+            spawn_topmost_watch(handle.clone(), watch_flag);
 
             // If autostart is on, re-register it so the login entry always points
             // at THIS executable. This heals a stale path left behind by a dev

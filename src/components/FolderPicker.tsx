@@ -122,7 +122,7 @@ export default function FolderPicker({
         ].join(" ")}
       >
         <FolderIcon className="shrink-0 text-[15px]" />
-        <span className="hidden truncate sm:inline">
+        <span className="hidden truncate md:inline">
           {folderLabel(folders, value)}
         </span>
       </button>

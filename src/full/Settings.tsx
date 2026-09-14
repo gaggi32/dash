@@ -11,6 +11,10 @@ import {
 } from "../lib/shortcut";
 import { KeyboardIcon, UsersIcon } from "../components/icons";
 import { isLinked, setLinked, sharingSupported } from "../lib/link";
+import {
+  getStayOnTopFullscreen,
+  setStayOnTopFullscreen,
+} from "../lib/topmost";
 
 export default function Settings() {
   const [hotkey, setHotkeyValue] = useState(getHotkey());
@@ -19,6 +23,7 @@ export default function Settings() {
   const [preview, setPreview] = useState<string>("");
   const [status, setStatus] = useState<string | null>(null);
   const [autostart, setAutostart] = useState(false);
+  const [stayOnTop, setStayOnTop] = useState(getStayOnTopFullscreen);
   // Account linking: whether this platform offers it, whether it's on, and a
   // line of feedback after the merge that runs on first link.
   const [sharing, setSharing] = useState(false);
@@ -146,6 +151,15 @@ export default function Settings() {
     }
   };
 
+  const toggleStayOnTop = async (next: boolean) => {
+    try {
+      await setStayOnTopFullscreen(next);
+      setStayOnTop(next);
+    } catch (err) {
+      console.error("stay-on-top toggle failed:", err);
+    }
+  };
+
   const keys = acceleratorToKeys(
     recording ? preview || "…" : hotkey,
   );
@@ -249,6 +263,28 @@ export default function Settings() {
           <span className="block font-medium">Launch at login</span>
           <span className="block text-xs text-neutral-500 dark:text-neutral-400">
             Starts hidden in the tray, ready for your hotkey.
+          </span>
+        </span>
+      </label>
+
+      <div className="h-px bg-neutral-200 dark:bg-neutral-800" />
+
+      <label className="flex cursor-pointer items-center gap-3">
+        <span className="relative inline-flex">
+          <input
+            type="checkbox"
+            checked={stayOnTop}
+            onChange={(e) => void toggleStayOnTop(e.target.checked)}
+            className="peer sr-only"
+          />
+          <span className="h-6 w-10 rounded-full bg-neutral-300 ring-1 ring-inset ring-black/[0.06] transition-colors peer-checked:bg-gradient-to-b peer-checked:from-neutral-700 peer-checked:to-neutral-900 dark:bg-neutral-700 dark:ring-white/5 dark:peer-checked:from-neutral-300 dark:peer-checked:to-neutral-500" />
+          <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
+        </span>
+        <span>
+          <span className="block font-medium">Stay on top of fullscreen apps</span>
+          <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+            Keeps the quick-add panel above games and fullscreen video, even
+            when they try to reclaim focus.
           </span>
         </span>
       </label>
