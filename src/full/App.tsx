@@ -38,6 +38,7 @@ import {
   XIcon,
 } from "../components/icons";
 import FolderList from "./FolderList";
+import NotesPanel from "./NotesPanel";
 import SelectionBar from "./SelectionBar";
 import Settings from "./Settings";
 import SortMenu from "./SortMenu";
@@ -79,6 +80,10 @@ export default function App() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const lastSelectedIndex = useRef<number | null>(null);
+  /** Task whose notes are open in the right-hand sidebar, if any. */
+  const [notesId, setNotesId] = useState<number | null>(null);
+  const notesTask =
+    notesId === null ? null : (tasks.find((t) => t.id === notesId) ?? null);
 
   const reload = useCallback(async () => {
     try {
@@ -166,6 +171,9 @@ export default function App() {
       for (const id of prev) if (live.has(id)) next.add(id);
       return next.size === prev.size ? prev : next;
     });
+    // Same for the notes sidebar, so it doesn't spring back open if the task
+    // reappears later. The panel has already flushed its draft on unmount.
+    setNotesId((id) => (id !== null && !tasks.some((t) => t.id === id) ? null : id));
   }, [tasks]);
 
   const exitSelectMode = () => {
@@ -203,8 +211,10 @@ export default function App() {
   };
 
   return (
-    <div className="app-bg h-screen overflow-hidden text-neutral-900 dark:text-neutral-100">
-      <div className="relative mx-auto flex h-full max-w-5xl">
+    // A flex row so the notes sidebar can dock against the window's right edge
+    // while the task column stays capped and centred in whatever space is left.
+    <div className="app-bg relative flex h-screen overflow-hidden text-neutral-900 dark:text-neutral-100">
+      <div className="relative mx-auto flex h-full min-w-0 max-w-5xl flex-1">
         {view === "settings" ? (
           <SettingsView key="settings" onBack={() => setView("home")} />
         ) : (
@@ -254,7 +264,10 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={() => setView("settings")}
+                  onClick={() => {
+                    setNotesId(null);
+                    setView("settings");
+                  }}
                   className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[18px] text-neutral-500 transition-colors hover:bg-neutral-200/70 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
                   title="Settings"
                 >
@@ -352,6 +365,10 @@ export default function App() {
                         }
                         onSave={(fields) => void updateTask(task.id, fields)}
                         onDelete={() => void deleteTask(task.id)}
+                        notesOpen={notesId === task.id}
+                        onToggleNotes={() =>
+                          setNotesId((id) => (id === task.id ? null : task.id))
+                        }
                       />
                     ))}
                   </ul>
@@ -361,6 +378,27 @@ export default function App() {
           </>
         )}
       </div>
+
+      {view === "home" && notesTask && (
+        <>
+          {/* Scrim behind the notes drawer; only below `lg`, where it overlays the list. */}
+          <button
+            type="button"
+            aria-label="Close notes"
+            onClick={() => setNotesId(null)}
+            className="absolute inset-0 z-30 bg-neutral-950/30 lg:hidden"
+          />
+          <NotesPanel
+            // Keyed by task so switching tasks remounts it: the old panel
+            // flushes its own draft, the new one starts from the new notes.
+            key={notesTask.id}
+            task={notesTask}
+            folders={folders}
+            onSave={(notes) => updateTask(notesTask.id, { notes })}
+            onClose={() => setNotesId(null)}
+          />
+        </>
+      )}
     </div>
   );
 }

@@ -6,6 +6,8 @@ export interface Task {
   completed: boolean;
   /** Folder this task is filed under, or null for unfiled. */
   folderId: number | null;
+  /** Free-form extra detail written in the notes sidebar; empty string when none. */
+  notes: string;
   /** SQLite `datetime('now')` UTC timestamps, e.g. "2026-06-29 14:03:11". */
   createdAt: string;
   updatedAt: string;

@@ -27,6 +27,7 @@ import {
   Pencil,
   Plus,
   Settings,
+  StickyNote,
   Trash2,
   Users,
   X,
@@ -62,3 +63,4 @@ export const PencilIcon = icon(Pencil);
 export const UsersIcon = icon(Users);
 export const CheckSquareIcon = icon(CheckSquare);
 export const XIcon = icon(X);
+export const NotesIcon = icon(StickyNote);

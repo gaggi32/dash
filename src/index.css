@@ -205,11 +205,27 @@ html.quick input {
   transform-origin: top center;
 }
 
+/* The notes sidebar easing in from the right edge. */
+@keyframes slide-in-right {
+  0% {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.slide-in-right {
+  animation: slide-in-right 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .liquid-in,
   .liquid-in::after,
   .rise-in,
-  .pop-in {
+  .pop-in,
+  .slide-in-right {
     animation: none !important;
   }
 }

@@ -20,6 +20,7 @@ interface TaskRow {
   due_date: string | null;
   completed: number;
   folder_id: number | null;
+  notes: string;
   created_at: string;
   updated_at: string;
 }
@@ -72,7 +73,7 @@ async function mergePrivateInto(sharedUrl: string): Promise<number> {
   }
 
   const tasks = await from.select<TaskRow[]>(
-    "SELECT title, due_date, completed, folder_id, created_at, updated_at FROM tasks",
+    "SELECT title, due_date, completed, folder_id, notes, created_at, updated_at FROM tasks",
   );
 
   let copied = 0;
@@ -85,13 +86,14 @@ async function mergePrivateInto(sharedUrl: string): Promise<number> {
     if ((dupes[0]?.n ?? 0) > 0) continue;
 
     await to.execute(
-      `INSERT INTO tasks (title, due_date, completed, folder_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO tasks (title, due_date, completed, folder_id, notes, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         t.title,
         t.due_date,
         t.completed,
         t.folder_id === null ? null : (remap.get(t.folder_id) ?? null),
+        t.notes,
         t.created_at,
         t.updated_at,
       ],

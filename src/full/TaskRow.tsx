@@ -5,6 +5,7 @@ import {
   CalendarIcon,
   CheckIcon,
   FolderIcon,
+  NotesIcon,
   TrashIcon,
 } from "../components/icons";
 import { formatDue, isOverdue } from "../lib/date";
@@ -24,6 +25,9 @@ interface Props {
     folderId: number | null;
   }) => void;
   onDelete: () => void;
+  /** True while this task's notes are open in the sidebar. */
+  notesOpen: boolean;
+  onToggleNotes: () => void;
 }
 
 /** Which inline panel the editor has open below its controls, if any. */
@@ -38,6 +42,8 @@ export default function TaskRow({
   onToggle,
   onSave,
   onDelete,
+  notesOpen,
+  onToggleNotes,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(task.title);
@@ -85,6 +91,9 @@ export default function TaskRow({
 
   const toggle = (next: Panel) => setPanel((p) => (p === next ? null : next));
 
+  // First non-blank line, shown as a one-line preview under the title.
+  const notePreview = task.notes.trim().split("\n", 1)[0];
+
   if (editing) {
     return (
       <li className="surface rounded-xl border-neutral-400/80 p-3.5 ring-neutral-900/5 dark:border-neutral-500/60">
@@ -124,6 +133,22 @@ export default function TaskRow({
           >
             <FolderIcon className="shrink-0 text-[15px]" />
             <span className="truncate">{folderLabel(folders, folder)}</span>
+          </button>
+
+          {/* Notes save on their own as they're typed, so this opens the
+              sidebar without touching the pending title/date/folder edit. */}
+          <button
+            type="button"
+            onClick={onToggleNotes}
+            className={[
+              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+              notePreview || notesOpen
+                ? "accent-soft"
+                : "text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800",
+            ].join(" ")}
+          >
+            <NotesIcon className="text-[15px]" />
+            {notePreview ? "Notes" : "Add notes"}
           </button>
 
           <div className="ml-auto flex gap-2">
@@ -179,7 +204,14 @@ export default function TaskRow({
       : (folders.find((f) => f.id === task.folderId)?.name ?? null);
 
   return (
-    <li className="surface group flex items-center gap-3 rounded-xl p-3.5 transition-colors hover:border-neutral-400/70 dark:hover:border-neutral-500/50">
+    <li
+      className={[
+        "surface group flex items-center gap-3 rounded-xl p-3.5 transition-colors",
+        notesOpen
+          ? "border-neutral-400/80 dark:border-neutral-500/60"
+          : "hover:border-neutral-400/70 dark:hover:border-neutral-500/50",
+      ].join(" ")}
+    >
       {selectable && (
         <button
           type="button"
@@ -226,7 +258,7 @@ export default function TaskRow({
         >
           {task.title}
         </span>
-        {(task.dueDate || folderName) && (
+        {(task.dueDate || folderName || notePreview) && (
           <span className="mt-0.5 flex items-center gap-2.5 text-xs font-medium">
             {task.dueDate && (
               <span
@@ -248,18 +280,41 @@ export default function TaskRow({
                 <span className="truncate">{folderName}</span>
               </span>
             )}
+            {notePreview && (
+              <span className="inline-flex min-w-0 items-center gap-1 text-neutral-400 dark:text-neutral-500">
+                <NotesIcon className="shrink-0 text-[12px]" />
+                <span className="truncate">{notePreview}</span>
+              </span>
+            )}
           </span>
         )}
       </button>
 
-      <button
-        type="button"
-        onClick={onDelete}
-        title="Delete task"
-        className="shrink-0 rounded-md p-2 text-neutral-400 opacity-0 transition-colors hover:bg-neutral-100 hover:text-red-600 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-neutral-800 dark:hover:text-red-400"
-      >
-        <TrashIcon className="text-[16px]" />
-      </button>
+      <div className="flex shrink-0 items-center gap-0.5">
+        <button
+          type="button"
+          onClick={onToggleNotes}
+          title={notesOpen ? "Close notes" : notePreview ? "Open notes" : "Add notes"}
+          aria-pressed={notesOpen}
+          className={[
+            "rounded-md p-2 transition-colors",
+            notesOpen
+              ? "accent-soft"
+              : "text-neutral-400 opacity-0 hover:bg-neutral-100 hover:text-neutral-900 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-neutral-800 dark:hover:text-neutral-100",
+          ].join(" ")}
+        >
+          <NotesIcon className="text-[16px]" />
+        </button>
+
+        <button
+          type="button"
+          onClick={onDelete}
+          title="Delete task"
+          className="rounded-md p-2 text-neutral-400 opacity-0 transition-colors hover:bg-neutral-100 hover:text-red-600 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-neutral-800 dark:hover:text-red-400"
+        >
+          <TrashIcon className="text-[16px]" />
+        </button>
+      </div>
     </li>
   );
 }

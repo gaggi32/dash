@@ -21,6 +21,9 @@ windows.
   full window.
 - **Full window** — list of all tasks with All / Active / Completed filters,
   sort by created order or due date, inline edit, complete toggle, delete.
+- **Notes** — every task can carry free-form notes. The notes button on a row
+  (or **Add notes** while editing) opens a sidebar on the right that saves as
+  you type; the first line shows as a preview under the task title.
 - **Shared SQLite store** — both windows read/write the same DB; a
   `tasks-changed` event keeps them in sync in real time.
 - **Configurable hotkey** and **launch-at-login** toggle in Settings.
@@ -71,6 +74,7 @@ Dash/
 │  └─ full/
 │     ├─ App.tsx            # Full window: list/filter/sort
 │     ├─ TaskRow.tsx        # Row: complete / inline edit / delete
+│     ├─ NotesPanel.tsx     # Right-hand notes sidebar (autosaves)
 │     └─ Settings.tsx       # Hotkey + launch-at-login
 └─ src-tauri/
    ├─ Cargo.toml
@@ -190,8 +194,9 @@ if (!(await isEnabled())) await enable();
   Support/com.dash.quickcapture` on macOS, `~/.local/share/com.dash.quickcapture`
   on Linux).
 - Schema (`tasks`): `id`, `title`, `due_date` (`YYYY-MM-DD` or null),
-  `completed` (0/1), `created_at`, `updated_at`. Created by the v1 migration in
-  `src-tauri/src/lib.rs`; add a v2 `Migration` to evolve it.
+  `completed` (0/1), `folder_id` (or null), `notes` (text, `''` when empty),
+  `created_at`, `updated_at`. Built up by the numbered migrations in
+  `src-tauri/src/lib.rs`; add the next `Migration` to evolve it.
 
 ---
 

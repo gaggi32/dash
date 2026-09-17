@@ -19,6 +19,7 @@ interface TaskRow {
   due_date: string | null;
   completed: number;
   folder_id: number | null;
+  notes: string;
   created_at: string;
   updated_at: string;
 }
@@ -67,6 +68,7 @@ function toTask(r: TaskRow): Task {
     dueDate: r.due_date,
     completed: !!r.completed,
     folderId: r.folder_id,
+    notes: r.notes,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -129,7 +131,12 @@ export async function listTasks(
 
 export async function updateTask(
   id: number,
-  fields: { title?: string; dueDate?: string | null; folderId?: number | null },
+  fields: {
+    title?: string;
+    dueDate?: string | null;
+    folderId?: number | null;
+    notes?: string;
+  },
 ): Promise<void> {
   const d = await db();
   const sets: string[] = [];
@@ -146,6 +153,12 @@ export async function updateTask(
   if (fields.folderId !== undefined) {
     sets.push(`folder_id = $${args.length + 1}`);
     args.push(fields.folderId);
+  }
+  // Stored exactly as typed: notes autosave mid-sentence, so trimming here
+  // would eat the space the user just pressed.
+  if (fields.notes !== undefined) {
+    sets.push(`notes = $${args.length + 1}`);
+    args.push(fields.notes);
   }
   if (sets.length === 0) return;
 

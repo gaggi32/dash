@@ -286,6 +286,14 @@ fn migrations() -> Vec<Migration> {
             ALTER TABLE tasks ADD COLUMN folder_id INTEGER;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "add_task_notes",
+            // NOT NULL with an empty default so existing rows (and the frontend)
+            // never have to tell "no notes" and NULL apart.
+            sql: "ALTER TABLE tasks ADD COLUMN notes TEXT NOT NULL DEFAULT '';",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
