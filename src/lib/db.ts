@@ -79,8 +79,8 @@ function toTask(r: TaskRow): Task {
 export async function createTask(input: NewTask): Promise<number> {
   const d = await db();
   const res = await d.execute(
-    "INSERT INTO tasks (title, due_date, folder_id) VALUES ($1, $2, $3)",
-    [input.title.trim(), input.dueDate ?? null, input.folderId ?? null],
+    "INSERT INTO tasks (title, due_date, folder_id, notes) VALUES ($1, $2, $3, $4)",
+    [input.title.trim(), input.dueDate ?? null, input.folderId ?? null, input.notes ?? ""],
   );
   await notifyChange();
   return Number(res.lastInsertId);

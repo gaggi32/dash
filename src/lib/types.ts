@@ -17,6 +17,7 @@ export interface NewTask {
   title: string;
   dueDate?: string | null;
   folderId?: number | null;
+  notes?: string;
 }
 
 /** A named bucket for tasks — "School", "Work" — listed in the sidebar. */

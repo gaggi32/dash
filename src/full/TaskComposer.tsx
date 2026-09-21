@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Calendar from "../components/Calendar";
 import FolderPicker from "../components/FolderPicker";
-import { CalendarIcon, PlusIcon } from "../components/icons";
+import { CalendarIcon, PlusIcon, NotesIcon } from "../components/icons";
 import { createTask } from "../lib/db";
 import { formatDue } from "../lib/date";
 import type { Folder, FolderScope } from "../lib/types";
@@ -20,6 +20,8 @@ interface Props {
 export default function TaskComposer({ folders, scope }: Props) {
   const [title, setTitle] = useState("");
   const [due, setDue] = useState<string | null>(null);
+  const [notes, setNotes] = useState("");
+  const [notesOpen, setNotesOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
   // Explicit folder choice for this one task. Null means "follow the sidebar",
   // so switching folders re-targets the composer without extra clicks.
@@ -63,13 +65,15 @@ export default function TaskComposer({ folders, scope }: Props) {
       return;
     }
     try {
-      await createTask({ title: t, dueDate: due, folderId: target });
+      await createTask({ title: t, dueDate: due, folderId: target, notes: notes.trim() });
     } catch (err) {
       console.error("Failed to save task:", err);
       return;
     }
     setTitle("");
     setDue(null);
+    setNotes("");
+    setNotesOpen(false);
     setCalOpen(false);
     inputRef.current?.focus();
   }, [title, due, target]);
@@ -84,8 +88,9 @@ export default function TaskComposer({ folders, scope }: Props) {
           e.preventDefault();
           void add();
         }}
-        className="surface flex items-center gap-1 rounded-xl p-2 pl-3.5 transition-colors focus-within:border-neutral-500 sm:gap-2 dark:focus-within:border-neutral-400"
+        className="surface flex flex-col gap-2 rounded-xl p-2 transition-colors focus-within:border-neutral-500 dark:focus-within:border-neutral-400"
       >
+        <div className="flex items-center gap-1 sm:gap-2 pl-1.5">
         <PlusIcon className="shrink-0 text-[18px] text-neutral-400" />
         <input
           ref={inputRef}
@@ -119,12 +124,37 @@ export default function TaskComposer({ folders, scope }: Props) {
         </button>
 
         <button
+          type="button"
+          onClick={() => setNotesOpen((v) => !v)}
+          className={[
+            "inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors",
+            notesOpen || notes.trim()
+              ? "accent-soft"
+              : "text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800",
+          ].join(" ")}
+        >
+          <NotesIcon className="text-[15px]" />
+          <span className="hidden md:inline">Notes</span>
+        </button>
+
+        <button
           type="submit"
           disabled={!title.trim()}
           className="accent accent-hover inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 sm:px-4 text-[13px] font-medium transition-colors disabled:from-neutral-200 disabled:to-neutral-200 disabled:text-neutral-400 disabled:shadow-none disabled:ring-0 dark:disabled:from-neutral-800 dark:disabled:to-neutral-800 dark:disabled:text-neutral-600"
         >
           Add
         </button>
+        </div>
+
+        {notesOpen && (
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Add notes..."
+            className="w-full resize-none bg-transparent px-2.5 py-1.5 text-[14px] text-neutral-800 outline-none placeholder:text-neutral-400 dark:text-neutral-200"
+            rows={3}
+          />
+        )}
       </form>
 
       {calOpen && (

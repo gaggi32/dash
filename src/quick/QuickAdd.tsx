@@ -15,6 +15,7 @@ import {
   HomeIcon,
   ArrowRightIcon,
   CheckIcon,
+  NotesIcon,
 } from "../components/icons";
 import { createTask, listFolders, reopen } from "../lib/db";
 import { onDbChanged, onTasksChanged } from "../lib/events";
@@ -27,13 +28,13 @@ type Panel = "date" | "folder" | null;
 // Collapsed size must match the `quick` window in tauri.conf.json so the first
 // paint isn't resized. The others are tall enough for the panel they open.
 const COMPACT = new LogicalSize(440, 168);
-const WITH_DATE = new LogicalSize(440, 476);
-const WITH_FOLDER = new LogicalSize(440, 396);
 
-function sizeFor(panel: Panel): LogicalSize {
-  if (panel === "date") return WITH_DATE;
-  if (panel === "folder") return WITH_FOLDER;
-  return COMPACT;
+function sizeFor(panel: Panel, notesOpen: boolean): LogicalSize {
+  let h = 168;
+  if (panel === "date") h = 476;
+  else if (panel === "folder") h = 396;
+  if (notesOpen) h += 80;
+  return new LogicalSize(440, h);
 }
 
 export default function QuickAdd() {
@@ -43,6 +44,8 @@ export default function QuickAdd() {
   const [folder, setFolder] = useState<number | null>(null);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [panel, setPanel] = useState<Panel>(null);
+  const [notes, setNotes] = useState("");
+  const [notesOpen, setNotesOpen] = useState(false);
   // Bumped each time the window is shown so the liquid entrance replays.
   const [appear, setAppear] = useState(0);
   // Bumped on each save to flash a brief "Added ✓" confirmation.
@@ -66,6 +69,8 @@ export default function QuickAdd() {
     setDue(null);
     setFolder(null);
     setPanel(null);
+    setNotes("");
+    setNotesOpen(false);
   }, []);
 
   const hide = useCallback(async () => {
@@ -134,9 +139,9 @@ export default function QuickAdd() {
   // to where it was once the panel closes.
   useEffect(() => {
     void (async () => {
-      const size = sizeFor(panel);
+      const size = sizeFor(panel, notesOpen);
 
-      if (panel) {
+      if (panel || notesOpen) {
         const pos = await win.outerPosition();
         await win.setSize(size);
         const mon = await currentMonitor();
@@ -159,7 +164,7 @@ export default function QuickAdd() {
       const pos = await win.outerPosition();
       await win.setPosition(new PhysicalPosition(pos.x, y));
     })();
-  }, [panel, win]);
+  }, [panel, notesOpen, win]);
 
   // Hide the confirmation again a moment after it appears.
   useEffect(() => {
@@ -175,7 +180,7 @@ export default function QuickAdd() {
       return;
     }
     try {
-      await createTask({ title: t, dueDate: due, folderId: folder });
+      await createTask({ title: t, dueDate: due, folderId: folder, notes: notes.trim() });
     } catch (err) {
       console.error("Failed to save task:", err);
       return;
@@ -186,9 +191,11 @@ export default function QuickAdd() {
     setTitle("");
     setDue(null);
     setPanel(null);
+    setNotes("");
+    setNotesOpen(false);
     setAdded((n) => n + 1);
     focusInput();
-  }, [title, due, folder]);
+  }, [title, due, folder, notes]);
 
   const goHome = useCallback(async () => {
     await invoke("open_main");
@@ -253,6 +260,20 @@ export default function QuickAdd() {
               </span>
             </button>
 
+            <button
+              type="button"
+              onClick={() => setNotesOpen((v) => !v)}
+              className={[
+                "inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-medium transition-all",
+                notesOpen || notes.trim()
+                  ? "bg-neutral-900/[0.06] text-neutral-700 ring-1 ring-neutral-900/10 dark:bg-white/10 dark:text-neutral-200 dark:ring-white/15"
+                  : "text-neutral-500 hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10",
+              ].join(" ")}
+            >
+              <NotesIcon className="text-[15px]" />
+              Notes
+            </button>
+
             {added > 0 && (
               <span
                 key={added}
@@ -282,6 +303,16 @@ export default function QuickAdd() {
               </button>
             </div>
           </div>
+
+          {notesOpen && (
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add notes..."
+              className="mt-2.5 w-full resize-none rounded-xl border border-black/5 bg-black/[0.035] px-4 py-3 text-[14px] text-neutral-900 outline-none transition-all placeholder:text-neutral-400 focus:border-neutral-400/50 focus:bg-white focus:ring-4 focus:ring-neutral-900/[0.06] dark:border-white/5 dark:bg-white/[0.06] dark:text-neutral-50 dark:focus:bg-white/[0.09] dark:focus:ring-white/10"
+              rows={3}
+            />
+          )}
 
           {panel === "date" && (
             <div className="pop-in mt-2.5">
