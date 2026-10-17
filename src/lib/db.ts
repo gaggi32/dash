@@ -1,8 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import Database from "@tauri-apps/plugin-sql";
 import { daysFromTodayISO, todayISO } from "./date";
+import { discardAttachments, parseAttachments } from "./attachments";
 import { notifyChange } from "./events";
 import type {
+  Attachment,
   Filter,
   Folder,
   FolderCounts,
@@ -20,6 +22,7 @@ interface TaskRow {
   completed: number;
   folder_id: number | null;
   notes: string;
+  attachments: string;
   created_at: string;
   updated_at: string;
 }
@@ -69,6 +72,7 @@ function toTask(r: TaskRow): Task {
     completed: !!r.completed,
     folderId: r.folder_id,
     notes: r.notes,
+    attachments: parseAttachments(r.attachments),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -79,8 +83,14 @@ function toTask(r: TaskRow): Task {
 export async function createTask(input: NewTask): Promise<number> {
   const d = await db();
   const res = await d.execute(
-    "INSERT INTO tasks (title, due_date, folder_id, notes) VALUES ($1, $2, $3, $4)",
-    [input.title.trim(), input.dueDate ?? null, input.folderId ?? null, input.notes ?? ""],
+    "INSERT INTO tasks (title, due_date, folder_id, notes, attachments) VALUES ($1, $2, $3, $4, $5)",
+    [
+      input.title.trim(),
+      input.dueDate ?? null,
+      input.folderId ?? null,
+      input.notes ?? "",
+      JSON.stringify(input.attachments ?? []),
+    ],
   );
   await notifyChange();
   return Number(res.lastInsertId);
@@ -136,6 +146,7 @@ export async function updateTask(
     dueDate?: string | null;
     folderId?: number | null;
     notes?: string;
+    attachments?: Attachment[];
   },
 ): Promise<void> {
   const d = await db();
@@ -159,6 +170,10 @@ export async function updateTask(
   if (fields.notes !== undefined) {
     sets.push(`notes = $${args.length + 1}`);
     args.push(fields.notes);
+  }
+  if (fields.attachments !== undefined) {
+    sets.push(`attachments = $${args.length + 1}`);
+    args.push(JSON.stringify(fields.attachments));
   }
   if (sets.length === 0) return;
 
@@ -197,11 +212,11 @@ export async function setCompleted(id: number, completed: boolean): Promise<void
 
 export async function deleteTask(id: number): Promise<void> {
   const d = await db();
-  const rows = await d.select<{ title: string; due_date: string | null }[]>(
-    "SELECT title, due_date FROM tasks WHERE id = $1",
-    [id],
-  );
+  const rows = await d.select<
+    { title: string; due_date: string | null; attachments: string }[]
+  >("SELECT title, due_date, attachments FROM tasks WHERE id = $1", [id]);
   await d.execute("DELETE FROM tasks WHERE id = $1", [id]);
+  if (rows[0]) await discardAttachments(parseAttachments(rows[0].attachments));
 
   // While linked, the active db is the shared one, but this account's private
   // db still has its own copy of the row. Delete it there too (matched the

@@ -24,6 +24,7 @@ import {
   Keyboard,
   Layers,
   Menu,
+  Paperclip,
   Pencil,
   Plus,
   Settings,
@@ -64,3 +65,4 @@ export const UsersIcon = icon(Users);
 export const CheckSquareIcon = icon(CheckSquare);
 export const XIcon = icon(X);
 export const NotesIcon = icon(StickyNote);
+export const PaperclipIcon = icon(Paperclip);

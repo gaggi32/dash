@@ -6,6 +6,7 @@ import {
   CheckIcon,
   FolderIcon,
   NotesIcon,
+  PaperclipIcon,
   TrashIcon,
 } from "../components/icons";
 import { formatDue, isOverdue } from "../lib/date";
@@ -258,7 +259,7 @@ export default function TaskRow({
         >
           {task.title}
         </span>
-        {(task.dueDate || folderName || notePreview) && (
+        {(task.dueDate || folderName || notePreview || task.attachments.length > 0) && (
           <span className="mt-0.5 flex items-center gap-2.5 text-xs font-medium">
             {task.dueDate && (
               <span
@@ -284,6 +285,12 @@ export default function TaskRow({
               <span className="inline-flex min-w-0 items-center gap-1 text-neutral-400 dark:text-neutral-500">
                 <NotesIcon className="shrink-0 text-[12px]" />
                 <span className="truncate">{notePreview}</span>
+              </span>
+            )}
+            {task.attachments.length > 0 && (
+              <span className="inline-flex shrink-0 items-center gap-1 text-neutral-400 dark:text-neutral-500">
+                <PaperclipIcon className="text-[12px]" />
+                {task.attachments.length}
               </span>
             )}
           </span>

@@ -27,6 +27,11 @@ const MAIN_LABEL: &str = "main";
 /// Shared flag for the fullscreen-topmost watchdog (see [`spawn_topmost_watch`]).
 struct TopmostWatch(Arc<AtomicBool>);
 
+/// While true, losing focus doesn't hide the quick-add window. The native file
+/// picker takes focus from it, and without this the window would vanish (taking
+/// the half-written task with it) the moment the picker opened.
+struct HoldQuick(Arc<AtomicBool>);
+
 /// Connection string for this account's private database. Resolved by
 /// tauri-plugin-sql against the per-user app data dir.
 const LOCAL_DB_URL: &str = "sqlite:dash.db";
@@ -104,6 +109,206 @@ fn show_main(app: &AppHandle) {
     }
 }
 
+// ---- Attachments -----------------------------------------------------------
+//
+// Files attached to a task's notes are copied into the app's own storage rather
+// than referenced by path, so they survive the original being moved or deleted
+// and are reachable from every linked account. Layout: `<root>/<id>/<name>`,
+// where the id is unique and the name is kept so the default app opens a file
+// that still looks like what the user attached.
+
+const ATTACHMENTS_DIR: &str = "attachments";
+
+fn private_attachments_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|d| d.join(ATTACHMENTS_DIR))
+        .map_err(|e| e.to_string())
+}
+
+fn shared_attachments_dir() -> Option<PathBuf> {
+    shared_dir().map(|d| d.join(ATTACHMENTS_DIR))
+}
+
+/// Where new attachments go: beside the shared database while linked.
+fn attachments_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    if linked(app) {
+        if let Some(dir) = shared_attachments_dir() {
+            return Ok(dir);
+        }
+    }
+    private_attachments_dir(app)
+}
+
+/// Every place an attachment might live, current location first, so a file
+/// saved before linking (or after unlinking) is still found.
+fn attachment_roots(app: &AppHandle) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Ok(d) = attachments_dir(app) {
+        roots.push(d);
+    }
+    if let Ok(d) = private_attachments_dir(app) {
+        roots.push(d);
+    }
+    if let Some(d) = shared_attachments_dir() {
+        roots.push(d);
+    }
+    roots.dedup();
+    roots
+}
+
+/// Strips anything a file name can't carry on Windows (and path separators on
+/// every platform), so a hostile or odd name can never escape its folder.
+fn sanitize_file_name(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| match c {
+            '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            c if c.is_control() => '_',
+            c => c,
+        })
+        .collect();
+    let cleaned: String = cleaned.trim().trim_matches('.').chars().take(120).collect();
+    if cleaned.is_empty() {
+        "file".to_string()
+    } else {
+        cleaned
+    }
+}
+
+fn valid_attachment_id(id: &str) -> bool {
+    !id.is_empty() && id.chars().all(|c| c.is_ascii_digit() || c == '-')
+}
+
+/// Decodes the `%XX` escapes the frontend uses to smuggle a UTF-8 file name
+/// through an ASCII-only header.
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or("");
+            if let Ok(v) = u8::from_str_radix(hex, 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+static ATTACHMENT_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Stores one file. The bytes arrive as the raw request body (no base64 round
+/// trip) and the URL-encoded name in the `x-name` header. Returns `(id, name, size)`.
+#[tauri::command]
+fn save_attachment(
+    app: AppHandle,
+    request: tauri::ipc::Request<'_>,
+) -> Result<(String, String, u64), String> {
+    let tauri::ipc::InvokeBody::Raw(data) = request.body() else {
+        return Err("Expected the file contents as a raw body.".to_string());
+    };
+    let raw_name = request
+        .headers()
+        .get("x-name")
+        .and_then(|v| v.to_str().ok())
+        .map(percent_decode)
+        .unwrap_or_default();
+    let name = sanitize_file_name(&raw_name);
+
+    let millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let id = format!("{millis}-{}", ATTACHMENT_SEQ.fetch_add(1, Ordering::Relaxed));
+
+    let dir = attachments_dir(&app)?.join(&id);
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Couldn't create {}: {e}", dir.display()))?;
+    std::fs::write(dir.join(&name), data).map_err(|e| format!("Couldn't save the file: {e}"))?;
+    Ok((id, name, data.len() as u64))
+}
+
+fn find_attachment(app: &AppHandle, id: &str, name: &str) -> Result<PathBuf, String> {
+    if !valid_attachment_id(id) {
+        return Err("Invalid attachment id.".to_string());
+    }
+    let name = sanitize_file_name(name);
+    attachment_roots(app)
+        .into_iter()
+        .map(|r| r.join(id).join(&name))
+        .find(|p| p.is_file())
+        .ok_or_else(|| "That file is no longer available.".to_string())
+}
+
+/// Opens an attachment with the system's default application.
+#[tauri::command]
+fn open_attachment(app: AppHandle, id: String, name: String) -> Result<(), String> {
+    let path = find_attachment(&app, &id, &name)?;
+
+    #[cfg(target_os = "windows")]
+    let mut cmd = std::process::Command::new("explorer");
+    #[cfg(target_os = "macos")]
+    let mut cmd = std::process::Command::new("open");
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let mut cmd = std::process::Command::new("xdg-open");
+
+    cmd.arg(&path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("Couldn't open the file: {e}"))
+}
+
+/// Removes a stored attachment. Missing files are fine: the goal is "gone".
+#[tauri::command]
+fn delete_attachment(app: AppHandle, id: String) -> Result<(), String> {
+    if !valid_attachment_id(&id) {
+        return Err("Invalid attachment id.".to_string());
+    }
+    for root in attachment_roots(&app) {
+        let dir = root.join(&id);
+        if dir.is_dir() {
+            std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+/// Copies this account's attachments into the shared folder when linking, to go
+/// with the tasks the frontend merges in. Existing ids are left alone.
+fn merge_attachments_into_shared(app: &AppHandle) -> Result<(), String> {
+    let (Ok(from), Some(to)) = (private_attachments_dir(app), shared_attachments_dir()) else {
+        return Ok(());
+    };
+    let Ok(entries) = std::fs::read_dir(&from) else {
+        return Ok(());
+    };
+    for entry in entries.flatten() {
+        let target = to.join(entry.file_name());
+        if target.exists() || !entry.path().is_dir() {
+            continue;
+        }
+        std::fs::create_dir_all(&target).map_err(|e| e.to_string())?;
+        for file in std::fs::read_dir(entry.path()).map_err(|e| e.to_string())?.flatten() {
+            if file.path().is_file() {
+                std::fs::copy(file.path(), target.join(file.file_name()))
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Keep the quick window open while a native dialog (the file picker) has focus.
+#[tauri::command]
+fn hold_quick(app: AppHandle, hold: bool) {
+    app.state::<HoldQuick>().0.store(hold, Ordering::Relaxed);
+}
+
 // ---- IPC commands callable from the frontend -------------------------------
 
 #[tauri::command]
@@ -163,6 +368,7 @@ fn set_linked(app: AppHandle, enabled: bool) -> Result<String, String> {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
         std::fs::write(&marker, b"").map_err(|e| e.to_string())?;
+        merge_attachments_into_shared(&app)?;
     } else if marker.exists() {
         std::fs::remove_file(&marker).map_err(|e| e.to_string())?;
     }
@@ -294,6 +500,14 @@ fn migrations() -> Vec<Migration> {
             sql: "ALTER TABLE tasks ADD COLUMN notes TEXT NOT NULL DEFAULT '';",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "add_task_attachments",
+            // A JSON array of { id, name, size }; the files themselves live on
+            // disk (see the Attachments section above).
+            sql: "ALTER TABLE tasks ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]';",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -333,7 +547,12 @@ pub fn run() {
             Some(vec![AUTOSTART_FLAG]),
         ))
         .manage(TopmostWatch(Arc::new(AtomicBool::new(false))))
+        .manage(HoldQuick(Arc::new(AtomicBool::new(false))))
         .invoke_handler(tauri::generate_handler![
+            save_attachment,
+            open_attachment,
+            delete_attachment,
+            hold_quick,
             hide_quick,
             open_main,
             update_shortcut,
@@ -347,7 +566,10 @@ pub fn run() {
         ])
         .on_window_event(|window, event| match event {
             // Click outside / focus loss hides the quick window instantly.
-            WindowEvent::Focused(false) if window.label() == QUICK_LABEL => {
+            WindowEvent::Focused(false)
+                if window.label() == QUICK_LABEL
+                    && !window.state::<HoldQuick>().0.load(Ordering::Relaxed) =>
+            {
                 let _ = window.hide();
             }
             // Closing the full window hides it to the tray instead of quitting.

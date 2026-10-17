@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AttachmentBar, fileIntakeProps } from "../components/Attachments";
 import { CalendarIcon, FolderIcon, NotesIcon, XIcon } from "../components/icons";
 import { formatDue, isOverdue } from "../lib/date";
-import type { Folder, Task } from "../lib/types";
+import { discardAttachments, storeFiles } from "../lib/attachments";
+import type { Attachment, Folder, Task } from "../lib/types";
 
 interface Props {
   task: Task;
   folders: Folder[];
   onSave: (notes: string) => Promise<void>;
+  onSaveAttachments: (attachments: Attachment[]) => Promise<void>;
   onClose: () => void;
 }
 
@@ -27,8 +30,21 @@ const ADOPT_GRACE_MS = 1500;
  * by id) and autosaves: a short pause in typing writes the draft, and closing
  * or switching tasks flushes whatever is still pending.
  */
-export default function NotesPanel({ task, folders, onSave, onClose }: Props) {
+export default function NotesPanel({
+  task,
+  folders,
+  onSave,
+  onSaveAttachments,
+  onClose,
+}: Props) {
   const [draft, setDraft] = useState(task.notes);
+  const [files, setFiles] = useState<Attachment[]>(task.attachments);
+  const [busy, setBusy] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  // Latest list, so back-to-back adds/removes build on each other rather than
+  // on a render-stale copy.
+  const filesRef = useRef(files);
+  const filesLocal = useRef(0);
   const [status, setStatus] = useState<Status>("idle");
   const textRef = useRef<HTMLTextAreaElement>(null);
 
@@ -100,6 +116,45 @@ export default function NotesPanel({ task, folders, onSave, onClose }: Props) {
     savedRef.current = task.notes;
     setDraft(task.notes);
   }, [task.notes]);
+
+  // Attachments are written straight away (there's nothing to debounce), but
+  // still pick up changes from a linked account when we haven't touched them.
+  useEffect(() => {
+    const incoming = JSON.stringify(task.attachments);
+    if (incoming === JSON.stringify(filesRef.current)) return;
+    if (Date.now() - filesLocal.current < ADOPT_GRACE_MS) return;
+    filesRef.current = task.attachments;
+    setFiles(task.attachments);
+  }, [task.attachments]);
+
+  const commitFiles = async (next: Attachment[]) => {
+    filesRef.current = next;
+    filesLocal.current = Date.now();
+    setFiles(next);
+    try {
+      await onSaveAttachments(next);
+    } catch (err) {
+      console.error("Failed to save attachments:", err);
+      setFileError("Couldn't save attachments");
+    } finally {
+      filesLocal.current = Date.now();
+    }
+  };
+
+  const addFiles = async (picked: File[]) => {
+    if (picked.length === 0) return;
+    setBusy(true);
+    setFileError(null);
+    const { added, errors } = await storeFiles(picked);
+    if (errors.length) setFileError(errors.join(" · "));
+    if (added.length) await commitFiles([...filesRef.current, ...added]);
+    setBusy(false);
+  };
+
+  const removeFile = async (a: Attachment) => {
+    await commitFiles(filesRef.current.filter((x) => x.id !== a.id));
+    void discardAttachments([a]);
+  };
 
   const change = (value: string) => {
     setDraft(value);
@@ -184,7 +239,10 @@ export default function NotesPanel({ task, folders, onSave, onClose }: Props) {
         )}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col px-4 pb-4">
+      <div
+        className="flex min-h-0 flex-1 flex-col px-4 pb-4"
+        {...fileIntakeProps((f) => void addFiles(f))}
+      >
         <textarea
           ref={textRef}
           value={draft}
@@ -192,6 +250,14 @@ export default function NotesPanel({ task, folders, onSave, onClose }: Props) {
           onBlur={flush}
           placeholder="Add details, links, or anything worth remembering…"
           className="surface tidy-scroll min-h-0 flex-1 resize-none rounded-xl px-3.5 py-3 text-[14px] leading-relaxed text-neutral-800 outline-none transition-colors placeholder:text-neutral-400 focus:border-neutral-500 dark:text-neutral-100 dark:focus:border-neutral-400"
+        />
+        <AttachmentBar
+          className="mt-2"
+          items={files}
+          busy={busy}
+          error={fileError}
+          onFiles={(f) => void addFiles(f)}
+          onRemove={(a) => void removeFile(a)}
         />
         <p className="mt-2 flex items-center justify-between px-1 text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
           <span className={status === "error" ? "text-red-600 dark:text-red-400" : ""}>

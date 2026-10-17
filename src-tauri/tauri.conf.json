@@ -23,13 +23,14 @@
         "minHeight": 360,
         "resizable": true,
         "center": true,
-        "visible": false
+        "visible": false,
+        "dragDropEnabled": false
       },
       {
         "label": "quick",
         "title": "Quick Add",
         "url": "quick.html",
-        "width": 440,
+        "width": 460,
         "height": 168,
         "resizable": false,
         "decorations": false,
@@ -38,7 +39,8 @@
         "skipTaskbar": true,
         "center": true,
         "visible": false,
-        "shadow": false
+        "shadow": false,
+        "dragDropEnabled": false
       }
     ],
     "security": {

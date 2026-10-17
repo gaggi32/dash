@@ -7,6 +7,11 @@ import {
   LogicalSize,
   PhysicalPosition,
 } from "@tauri-apps/api/window";
+import {
+  AttachmentBar,
+  fileIntakeProps,
+  useAttachmentDraft,
+} from "../components/Attachments";
 import Calendar from "../components/Calendar";
 import { FolderSelect, folderLabel } from "../components/FolderPicker";
 import {
@@ -27,14 +32,15 @@ type Panel = "date" | "folder" | null;
 
 // Collapsed size must match the `quick` window in tauri.conf.json so the first
 // paint isn't resized. The others are tall enough for the panel they open.
-const COMPACT = new LogicalSize(440, 168);
+const COMPACT = new LogicalSize(460, 168);
 
 function sizeFor(panel: Panel, notesOpen: boolean): LogicalSize {
   let h = 168;
   if (panel === "date") h = 476;
   else if (panel === "folder") h = 396;
-  if (notesOpen) h += 80;
-  return new LogicalSize(440, h);
+  // Notes box plus the attach row beneath it.
+  if (notesOpen) h += 124;
+  return new LogicalSize(460, h);
 }
 
 export default function QuickAdd() {
@@ -46,6 +52,7 @@ export default function QuickAdd() {
   const [panel, setPanel] = useState<Panel>(null);
   const [notes, setNotes] = useState("");
   const [notesOpen, setNotesOpen] = useState(false);
+  const files = useAttachmentDraft();
   // Bumped each time the window is shown so the liquid entrance replays.
   const [appear, setAppear] = useState(0);
   // Bumped on each save to flash a brief "Added ✓" confirmation.
@@ -71,7 +78,9 @@ export default function QuickAdd() {
     setPanel(null);
     setNotes("");
     setNotesOpen(false);
-  }, []);
+    // Files the user attached but never saved a task for shouldn't pile up.
+    files.reset(true);
+  }, [files.reset]);
 
   const hide = useCallback(async () => {
     setPanel(null);
@@ -180,7 +189,13 @@ export default function QuickAdd() {
       return;
     }
     try {
-      await createTask({ title: t, dueDate: due, folderId: folder, notes: notes.trim() });
+      await createTask({
+        title: t,
+        dueDate: due,
+        folderId: folder,
+        notes: notes.trim(),
+        attachments: files.items,
+      });
     } catch (err) {
       console.error("Failed to save task:", err);
       return;
@@ -193,9 +208,10 @@ export default function QuickAdd() {
     setPanel(null);
     setNotes("");
     setNotesOpen(false);
+    files.reset(false);
     setAdded((n) => n + 1);
     focusInput();
-  }, [title, due, folder, notes]);
+  }, [title, due, folder, notes, files.items, files.reset]);
 
   const goHome = useCallback(async () => {
     await invoke("open_main");
@@ -219,6 +235,10 @@ export default function QuickAdd() {
             e.preventDefault();
             void send();
           }}
+          {...fileIntakeProps((f) => {
+            setNotesOpen(true);
+            void files.add(f);
+          })}
         >
           <input
             ref={inputRef}
@@ -265,7 +285,7 @@ export default function QuickAdd() {
               onClick={() => setNotesOpen((v) => !v)}
               className={[
                 "inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-medium transition-all",
-                notesOpen || notes.trim()
+                notesOpen || notes.trim() || files.items.length > 0
                   ? "bg-neutral-900/[0.06] text-neutral-700 ring-1 ring-neutral-900/10 dark:bg-white/10 dark:text-neutral-200 dark:ring-white/15"
                   : "text-neutral-500 hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10",
               ].join(" ")}
@@ -295,7 +315,7 @@ export default function QuickAdd() {
               </button>
               <button
                 type="submit"
-                disabled={!title.trim()}
+                disabled={!title.trim() || files.busy}
                 className="group inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-neutral-700 to-neutral-900 px-4 py-2 text-[13px] font-semibold text-white shadow-lg shadow-neutral-900/25 transition-all hover:shadow-neutral-900/40 enabled:hover:-translate-y-px disabled:from-neutral-300 disabled:to-neutral-300 disabled:text-neutral-500 disabled:shadow-none dark:from-neutral-500 dark:to-neutral-700 dark:shadow-black/40 dark:disabled:from-white/10 dark:disabled:to-white/10 dark:disabled:text-neutral-500"
               >
                 Add
@@ -305,13 +325,24 @@ export default function QuickAdd() {
           </div>
 
           {notesOpen && (
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add notes..."
-              className="mt-2.5 w-full resize-none rounded-xl border border-black/5 bg-black/[0.035] px-4 py-3 text-[14px] text-neutral-900 outline-none transition-all placeholder:text-neutral-400 focus:border-neutral-400/50 focus:bg-white focus:ring-4 focus:ring-neutral-900/[0.06] dark:border-white/5 dark:bg-white/[0.06] dark:text-neutral-50 dark:focus:bg-white/[0.09] dark:focus:ring-white/10"
-              rows={3}
-            />
+            <>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add notes..."
+                className="mt-2.5 w-full resize-none rounded-xl border border-black/5 bg-black/[0.035] px-4 py-3 text-[14px] text-neutral-900 outline-none transition-all placeholder:text-neutral-400 focus:border-neutral-400/50 focus:bg-white focus:ring-4 focus:ring-neutral-900/[0.06] dark:border-white/5 dark:bg-white/[0.06] dark:text-neutral-50 dark:focus:bg-white/[0.09] dark:focus:ring-white/10"
+                rows={3}
+              />
+              <AttachmentBar
+                className="mt-2"
+                items={files.items}
+                busy={files.busy}
+                error={files.error}
+                onFiles={(f) => void files.add(f)}
+                onRemove={files.remove}
+                holdQuick
+              />
+            </>
           )}
 
           {panel === "date" && (

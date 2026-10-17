@@ -395,6 +395,9 @@ export default function App() {
             task={notesTask}
             folders={folders}
             onSave={(notes) => updateTask(notesTask.id, { notes })}
+            onSaveAttachments={(attachments) =>
+              updateTask(notesTask.id, { attachments })
+            }
             onClose={() => setNotesId(null)}
           />
         </>

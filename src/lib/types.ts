@@ -1,3 +1,10 @@
+/** A file attached to a task's notes; the bytes live on disk, keyed by `id`. */
+export interface Attachment {
+  id: string;
+  name: string;
+  size: number;
+}
+
 /** A to-do item. `dueDate` is a local calendar date string `YYYY-MM-DD` or null. */
 export interface Task {
   id: number;
@@ -8,6 +15,7 @@ export interface Task {
   folderId: number | null;
   /** Free-form extra detail written in the notes sidebar; empty string when none. */
   notes: string;
+  attachments: Attachment[];
   /** SQLite `datetime('now')` UTC timestamps, e.g. "2026-06-29 14:03:11". */
   createdAt: string;
   updatedAt: string;
@@ -18,6 +26,7 @@ export interface NewTask {
   dueDate?: string | null;
   folderId?: number | null;
   notes?: string;
+  attachments?: Attachment[];
 }
 
 /** A named bucket for tasks — "School", "Work" — listed in the sidebar. */
