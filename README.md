@@ -1,232 +1,122 @@
-# Dash — quick-capture to-do app
+# Dash
 
-A cross-platform desktop quick-capture to-do app built with **Tauri v2** (Rust
-backend) and **React + TypeScript + Tailwind** (frontend). It lives in the
-system tray, opens a borderless quick-add window from a global hotkey anywhere
-in the OS, and stores tasks in a local **SQLite** database shared live between
-windows.
+A small to-do app for Windows and macOS that lives in your tray. Press a hotkey
+from anywhere, type the task, press Enter, and press Esc to get back to what
+you were doing.
 
----
+Your tasks stay on your own computer. No account, no cloud, no tracking.
 
-## Features
+## Download
 
-- **Background / login startup** — runs silently with only a tray icon; no
-  window and (on macOS) no Dock icon until you ask for one.
-- **Global hotkey** — `Ctrl+Shift+Space` (Windows/Linux) or `Cmd+Shift+Space`
-  (macOS) toggles a centered, always-on-top 400×150 quick-add window from any
-  app. Press again, click outside, or hit **Esc** to hide instantly (the
-  process keeps running).
-- **Quick add** — auto-focused text input, compact in-window calendar for an
-  optional due date, **Send** (or Enter) to save & hide, **Home** to open the
-  full window.
-- **Full window** — list of all tasks with All / Active / Completed filters,
-  sort by created order or due date, inline edit, complete toggle, delete.
-- **Notes** — every task can carry free-form notes. The notes button on a row
-  (or **Add notes** while editing) opens a sidebar on the right that saves as
-  you type; the first line shows as a preview under the task title.
-- **Shared SQLite store** — both windows read/write the same DB; a
-  `tasks-changed` event keeps them in sync in real time.
-- **Configurable hotkey** and **launch-at-login** toggle in Settings.
+Get the newest version from the
+[releases page](https://github.com/gaggi32/dash/releases/latest):
 
----
+| System | File |
+| --- | --- |
+| Windows 10 / 11 (64-bit) | `Dash-<version>-x64-setup.exe` |
+| macOS 11+ on Apple Silicon (M1 and later) | `Dash-<version>-arm64.dmg` |
+| macOS 11+ on Intel | `Dash-<version>-x64.dmg` |
 
-## Architecture & key decisions
+Each file has a `.sha256` next to it if you want to check your download
+(`Get-FileHash .\file.exe` on Windows, `shasum -a 256 file.dmg` on a Mac).
 
-| Concern | Decision | Why |
-| --- | --- | --- |
-| Two windows | Two HTML entry points (`index.html`, `quick.html`) built by Vite, sharing `src/lib/*` | Clean separation, one bundle, one data layer |
-| Data | `tauri-plugin-sql` (SQLite). Schema via a Rust migration; CRUD in `src/lib/db.ts` | Plugin handles the connection; SQL stays close to the UI |
-| Cross-window sync | After every write, broadcast a `tasks-changed` event; each window re-queries | No shared in-memory state to keep consistent |
-| Date picker | Custom in-window `Calendar` (not native `<input type=date>`) | A native picker opens an OS popup that steals focus and would trip the quick window's hide-on-blur. The window grows 400×150 → 400×430 when the calendar opens, then re-centers |
-| Hide-on-blur | Rust hides the quick window on `Focused(false)` | "Click outside to dismiss" without polling |
-| Closing full window | Intercept `CloseRequested`, hide instead of quit | Keeps the app alive in the tray |
-| macOS Dock | `ActivationPolicy::Accessory` | Menu-bar app with no Dock icon |
-| Hotkey | Default registered in Rust at startup; re-registered at runtime via the `update_shortcut` command; persisted in `localStorage` | Works before any webview loads, still user-configurable |
+### The first time you open it
 
----
+Dash is not signed with a paid Microsoft or Apple certificate yet, so each
+system asks once:
 
-## Project structure
+- **Windows:** "Windows protected your PC" → **More info** → **Run anyway**.
+  The installer then asks whether to install for just you (no admin rights) or
+  for everyone on the computer.
+- **macOS:** open the `.dmg`, drag Dash into Applications and open it. When
+  macOS says it cannot check the app, go to **System Settings → Privacy &
+  Security**, scroll down and click **Open Anyway**.
 
-```
-Dash/
-├─ index.html               # Full-window entry
-├─ quick.html               # Quick-add entry (transparent, class="quick")
-├─ package.json
-├─ vite.config.ts           # Multi-page build (main + quick)
-├─ tailwind.config.js / postcss.config.js
-├─ app-icon.png             # 1024px raster source for `tauri icon`
-├─ public/icon.svg          # Vector source for the icon + favicon
-├─ src/
-│  ├─ main.tsx              # Mounts <App/>  (full window)
-│  ├─ quick.tsx             # Mounts <QuickAdd/> (quick window)
-│  ├─ index.css             # Tailwind + quick-window transparency
-│  ├─ lib/
-│  │  ├─ types.ts           # Task / NewTask / Filter / SortKey
-│  │  ├─ db.ts              # SQLite CRUD (shared by both windows)
-│  │  ├─ events.ts          # tasks-changed broadcast/subscribe
-│  │  ├─ date.ts            # YYYY-MM-DD helpers
-│  │  └─ shortcut.ts        # Hotkey get/set/persist
-│  ├─ components/
-│  │  ├─ Calendar.tsx       # Compact, dependency-free month calendar
-│  │  └─ DashMark.tsx       # Brand mark, same geometry as the app icon
-│  ├─ quick/
-│  │  └─ QuickAdd.tsx       # Quick-add window UI + toggle/resize logic
-│  └─ full/
-│     ├─ App.tsx            # Full window: list/filter/sort
-│     ├─ TaskRow.tsx        # Row: complete / inline edit / delete
-│     ├─ NotesPanel.tsx     # Right-hand notes sidebar (autosaves)
-│     └─ Settings.tsx       # Hotkey + launch-at-login
-└─ src-tauri/
-   ├─ Cargo.toml
-   ├─ build.rs
-   ├─ tauri.conf.json       # Windows, bundle, security
-   ├─ capabilities/default.json   # v2 permissions
-   ├─ icons/                # Generated by `tauri icon`
-   └─ src/
-      ├─ main.rs
-      └─ lib.rs             # Tray, global shortcut, window mgmt, IPC, migrations
-```
+Dash runs in the tray (the menu bar on a Mac). When you open it by hand, the
+main window shows too.
 
----
+## Using it
 
-## Prerequisites
+| Where | What |
+| --- | --- |
+| Anywhere | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> (<kbd>⌘</kbd>+<kbd>⇧</kbd>+<kbd>Space</kbd> on a Mac) opens the quick-add box. Press it again to close it. |
+| Quick-add box | Type the task; <kbd>Enter</kbd> saves it and clears the box for the next one. The calendar button adds a due date, the folder button files it, the notes button adds notes and files (drop or paste them too). <kbd>Esc</kbd> or a click elsewhere closes it. |
+| Tray icon | Left-click opens the quick-add box. Right-click: **Open** (main window) and **Quit**. |
+| Main window | All / Active / Done; sort by newest or due date, or "Next week" for what is due in the next 7 days; folders on the left; edit a task in place; notes and attachments in the side panel. |
 
-1. **Node.js 18+** and npm.
-2. **Rust** (stable) via <https://rustup.rs>. Confirm with `cargo --version`.
-   > This scaffold's frontend has been built and type-checked, but the Rust side
-   > must be compiled on a machine with Cargo installed.
-3. **Platform dependencies for Tauri v2** — see the official list:
-   <https://v2.tauri.app/start/prerequisites/>. In short:
-   - **Windows:** Microsoft C++ Build Tools + WebView2 (preinstalled on Win 11).
-   - **macOS:** Xcode Command Line Tools (`xcode-select --install`).
-   - **Linux:** `webkit2gtk-4.1`, `libappindicator3` (tray), `librsvg2`, plus a
-     compositor for window transparency. Debian/Ubuntu example:
-     ```bash
-     sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
-       librsvg2-dev build-essential curl wget file libssl-dev libxdo-dev
-     ```
+Closing the main window keeps Dash running in the tray, so the hotkey keeps
+working. Use **Quit** in the tray menu to stop it.
 
----
+### Settings
 
-## Install & run (development)
+- **Global hotkey**: click it and press the keys you want (it needs at least
+  one modifier such as Ctrl or Alt).
+- **Launch at login**: starts Dash quietly in the tray.
+- **Stay on top of fullscreen apps**: keeps the quick-add box above games and
+  fullscreen video.
+- **Share with other Windows accounts**: see "Privacy and security" below.
+- **Check for updates**: once a day Dash asks GitHub for the newest version
+  number and shows a small notice if there is one. **Check now** does it on
+  demand. Updating is always your own download.
+
+## Your data
+
+| What | Where |
+| --- | --- |
+| Tasks and folders | `dash.db` (SQLite) in the app folder |
+| Attached files | `attachments` in the same folder (copies, so moving or deleting the original does not break them) |
+| Settings (hotkey, switches) | the app's web storage, kept by the system next to the app folder |
+
+The app folder is `%APPDATA%\com.dash.quickcapture` on Windows and
+`~/Library/Application Support/com.dash.quickcapture` on macOS.
+
+To back up your tasks, copy `dash.db` and `attachments` while Dash is not
+running.
+
+## Privacy and security
+
+- Everything stays on your computer. Dash has no account, no server and no
+  telemetry.
+- The only network request is the update check. It asks `api.github.com` for
+  the version number of the newest Dash release, and you can turn it off in
+  Settings.
+- The windows only show Dash's own pages: a strict content security policy is
+  set, and navigating anywhere else is blocked.
+- Attached files are copied into the app folder under a cleaned-up name and
+  open in your system's default app, the same as double-clicking them.
+- **Sharing with other Windows accounts** moves your task list to
+  `C:\Users\Public\Dash`. Every account on that computer can read and change
+  files there. That is the point of the feature, but it also means anyone who
+  can sign in to the PC, and any program they run, can read and change your
+  tasks and attached files. Only turn it on if you trust every account on the
+  computer.
+
+## Uninstall
+
+- **Windows:** Settings → Apps → Installed apps → Dash → Uninstall.
+- **macOS:** quit Dash from the menu bar and move it from Applications to the
+  Bin.
+
+Turn off **Launch at login** before you uninstall. Your tasks stay in the app
+folder above; delete that folder too if you want them gone.
+
+## Building it yourself
+
+You need [Node.js](https://nodejs.org) 20+, [Rust](https://rustup.rs) and the
+[Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your
+system.
 
 ```bash
 npm install
-
-# (Re)generate icons from the source PNG if needed. Tauri also writes
-# iOS/Android/Store assets this desktop-only app doesn't ship — delete
-# anything outside the five files listed in tauri.conf.json:
-npm run tauri icon ./app-icon.png
-
-# Run the full app (Rust + Vite dev server, hot reload):
-npm run tauri:dev
+npm run tauri:dev     # run it
+npm test              # tests
+npm run tauri:build   # installer in src-tauri/target/release/bundle/
 ```
 
-> **Windows:** if `npm run tauri:dev` fails with `LNK1104: cannot open file
-> "msvcrt.lib"`, your newest Visual Studio is missing the C++ x64 libraries.
-> Use the bundled launcher instead — it auto-selects a VS install that has them:
-> ```
-> run-dev.cmd        # dev    (wraps npm run tauri:dev)
-> run-build.cmd      # bundle (wraps npm run tauri:build)
-> ```
+On Windows, if a build fails with `LNK1104: cannot open file "msvcrt.lib"`, use
+`run-dev.cmd` / `run-build.cmd`: they pick a Visual Studio install that has the
+C++ tools.
 
-On launch you'll see **no window** — only a tray icon. Press the global hotkey
-(`Ctrl/Cmd+Shift+Space`) to open quick-add, or left-click the tray icon. Use the
-tray menu's **Open** (or the **Home** button) for the full window.
+Linux may build from source but is untested, and there are no Linux downloads.
 
-> **Frontend only** (no Rust): `npm run dev` serves `index.html` /
-> `quick.html`, but Tauri APIs (DB, tray, hotkey) only work under `tauri:dev`.
-
----
-
-## Build (production)
-
-```bash
-npm run tauri:build
-```
-
-Outputs platform installers/bundles under
-`src-tauri/target/release/bundle/`:
-
-- **Windows:** `.msi` (WiX) and `.exe` (NSIS).
-- **macOS:** `.app` and `.dmg`. Build on macOS. For a universal binary:
-  `npm run tauri:build -- --target universal-apple-darwin`.
-- **Linux:** `.deb`, `.rpm`, and `.AppImage`. Build on Linux.
-
-> Cross-compiling between OSes is not supported by Tauri — build each target on
-> (or in a VM/CI runner for) that OS.
-
----
-
-## Launch at startup (`tauri-plugin-autostart`)
-
-Already wired up:
-
-- **Rust** (`src-tauri/src/lib.rs`): the plugin is registered with
-  ```rust
-  .plugin(tauri_plugin_autostart::init(
-      tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-      None, // optional extra launch args
-  ))
-  ```
-- **Capabilities** (`src-tauri/capabilities/default.json`): grants
-  `autostart:allow-enable | allow-disable | allow-is-enabled`.
-- **UI** (`src/full/Settings.tsx`): the *"Launch Dash at login"* checkbox calls
-  `enable()` / `disable()` / `isEnabled()` from `@tauri-apps/plugin-autostart`.
-
-Because the app starts hidden (windows are `"visible": false`, macOS uses
-`Accessory`), launching at login means it quietly appears in the tray, ready for
-the hotkey. Under the hood the plugin uses the Windows registry `Run` key, a
-macOS `LaunchAgent`, and an XDG `.desktop` autostart entry on Linux.
-
-To enable it programmatically instead of via the checkbox:
-```ts
-import { enable, isEnabled } from "@tauri-apps/plugin-autostart";
-if (!(await isEnabled())) await enable();
-```
-
----
-
-## Data store
-
-- SQLite file `dash.db` in the OS app-data dir
-  (`%APPDATA%\com.dash.quickcapture` on Windows, `~/Library/Application
-  Support/com.dash.quickcapture` on macOS, `~/.local/share/com.dash.quickcapture`
-  on Linux).
-- Schema (`tasks`): `id`, `title`, `due_date` (`YYYY-MM-DD` or null),
-  `completed` (0/1), `folder_id` (or null), `notes` (text, `''` when empty),
-  `created_at`, `updated_at`. Built up by the numbered migrations in
-  `src-tauri/src/lib.rs`; add the next `Migration` to evolve it.
-
----
-
-## Customizing the hotkey
-
-Open **Settings** in the full window and edit the accelerator (e.g.
-`Alt+N`, `Super+T`, `CommandOrControl+Shift+K`). It's applied immediately via
-the `update_shortcut` command and persisted in `localStorage`. Format reference:
-<https://v2.tauri.app/plugin/global-shortcut/>.
-
----
-
-## Troubleshooting
-
-- **Quick window has a black/opaque background on Linux:** transparency needs a
-  running compositor. If unavailable, set `"transparent": false` (and optionally
-  `"decorations": true`) for the `quick` window in `tauri.conf.json`.
-- **Hotkey doesn't fire:** another app may own that combo. Change it in
-  Settings. Registration failures are logged to the Rust console (`tauri:dev`).
-- **Tray icon missing on Linux:** install `libayatana-appindicator3-dev`.
-- **Quick window hides while interacting:** hide-on-blur fires when focus leaves
-  the window. The in-window calendar avoids this; if you add any control that
-  spawns a native OS popup, disable the `Focused(false)` handler in `lib.rs`.
-- **Windows: `LINK : fatal error LNK1104: cannot open file "msvcrt.lib"`:** Rust
-  picked an MSVC toolset that doesn't have the C++ x64 runtime libs installed
-  (common when multiple Visual Studio editions are present and the newest one is
-  missing the "Desktop development with C++" libraries). Fix by either:
-  1. Building from the **"x64 Native Tools Command Prompt for VS 2022"** (Start
-     menu) — it sets `LIB`/`INCLUDE`/`PATH` to a complete toolset — then run
-     `npm run tauri:dev` there; or
-  2. Opening the **Visual Studio Installer → Modify** on your newest VS edition
-     and ensuring the **MSVC v14x x64/x86 build tools** + a **Windows 11 SDK**
-     components are checked, so any terminal can link.
+More detail for contributors is in [CLAUDE.md](CLAUDE.md).

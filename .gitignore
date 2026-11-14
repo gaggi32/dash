@@ -76,3 +76,6 @@ $RECYCLE.BIN/
 # Rust / Tauri build artifacts live under src-tauri/
 # (see src-tauri/.gitignore for the details)
 # ─────────────────────────────────────────────────────────────
+
+# Claude Code local settings
+.claude/settings.local.json
