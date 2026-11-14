@@ -5,12 +5,16 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+use serde::Serialize;
+use serde_json::Value as Json;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, WindowEvent,
+    AppHandle, Emitter, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    WindowEvent,
 };
 use tauri_plugin_autostart::ManagerExt;
+use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_global_shortcut::{
     Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
 };
@@ -23,6 +27,14 @@ const AUTOSTART_FLAG: &str = "--hidden";
 
 const QUICK_LABEL: &str = "quick";
 const MAIN_LABEL: &str = "main";
+
+/// Where a newer version is downloaded. Fixed here: the UI never names a URL.
+const DOWNLOAD_PAGE: &str = "https://github.com/gaggi32/dash/releases/latest";
+/// The update check reads this (no token, so the repo has to be public).
+const LATEST_RELEASE: &str = "https://api.github.com/repos/gaggi32/dash/releases/latest";
+
+/// One HTTP client for the process; used only by the update check.
+struct Http(reqwest::Client);
 
 /// Shared flag for the fullscreen-topmost watchdog (see [`spawn_topmost_watch`]).
 struct TopmostWatch(Arc<AtomicBool>);
@@ -83,6 +95,60 @@ fn default_shortcut() -> Shortcut {
     #[cfg(not(target_os = "macos"))]
     let mods = Modifiers::CONTROL | Modifiers::SHIFT;
     Shortcut::new(Some(mods), Code::Space)
+}
+
+// ---- Windows ---------------------------------------------------------------
+//
+// Both windows are built here rather than declared in tauri.conf.json, so each
+// gets a navigation guard: the webviews can only ever show the app's own pages,
+// and window.open / target=_blank open nothing.
+
+/// The app's own pages only. In dev that is the Vite server; in a build it is
+/// Tauri's asset protocol (tauri://localhost on macOS, http(s)://tauri.localhost
+/// on Windows).
+fn is_app_url(url: &Url) -> bool {
+    match url.scheme() {
+        "tauri" => true,
+        "http" | "https" => match url.host_str() {
+            Some("tauri.localhost") => true,
+            Some("localhost") => cfg!(debug_assertions) && url.port() == Some(1420),
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+fn build_main(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+    WebviewWindowBuilder::new(app, MAIN_LABEL, WebviewUrl::App("index.html".into()))
+        .title("Dash")
+        .inner_size(900.0, 640.0)
+        .min_inner_size(640.0, 360.0)
+        .resizable(true)
+        .center()
+        .visible(false)
+        // Lets the notes panel take HTML5 file drops instead of the OS handler.
+        .disable_drag_drop_handler()
+        .on_navigation(|url| is_app_url(url))
+        .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
+        .build()
+}
+
+fn build_quick(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+    WebviewWindowBuilder::new(app, QUICK_LABEL, WebviewUrl::App("quick.html".into()))
+        .title("Quick Add")
+        .inner_size(460.0, 168.0)
+        .resizable(false)
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .center()
+        .visible(false)
+        .shadow(false)
+        .disable_drag_drop_handler()
+        .on_navigation(|url| is_app_url(url))
+        .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
+        .build()
 }
 
 /// Toggle the borderless quick-add window: show+center+focus, or hide.
@@ -428,6 +494,72 @@ fn spawn_topmost_watch(app: AppHandle, flag: Arc<AtomicBool>) {
     });
 }
 
+// ---- Updates ---------------------------------------------------------------
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateInfo {
+    current: String,
+    latest: Option<String>,
+    newer: bool,
+}
+
+fn parse_version(v: &str) -> Option<(u64, u64, u64)> {
+    let mut it = v.trim().trim_start_matches('v').split('.').map(|p| p.parse::<u64>().ok());
+    Some((it.next()??, it.next()??, it.next()??))
+}
+
+/// The version in a GitHub release answer ("tag_name": "v1.2.3" gives "1.2.3").
+fn release_version(body: &Json) -> Option<String> {
+    let tag = body.get("tag_name")?.as_str()?.trim();
+    let v = tag.strip_prefix('v').unwrap_or(tag);
+    (v.len() <= 20 && parse_version(v).is_some()).then(|| v.to_string())
+}
+
+fn is_newer(latest: &str, current: &str) -> bool {
+    match (parse_version(latest), parse_version(current)) {
+        (Some(l), Some(c)) => l > c,
+        _ => false,
+    }
+}
+
+/// Ask GitHub for the newest published release. Only its version is read;
+/// installing is always the user's own download.
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Result<UpdateInfo, String> {
+    let current = app.package_info().version.to_string();
+    let http = app.state::<Http>().0.clone();
+    let res = http
+        .get(LATEST_RELEASE)
+        .header("Accept", "application/vnd.github+json")
+        .timeout(Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|_| "Could not reach GitHub".to_string())?;
+    if res.status() == reqwest::StatusCode::NOT_FOUND {
+        return Err("GitHub shows no public release yet".into());
+    }
+    if !res.status().is_success() {
+        return Err(format!("GitHub answered {}", res.status()));
+    }
+    let body: Json = res.json().await.map_err(|_| "Unexpected answer".to_string())?;
+    let latest = release_version(&body);
+    let newer = latest.as_deref().map_or(false, |l| is_newer(l, &current));
+    Ok(UpdateInfo { current, latest, newer })
+}
+
+#[tauri::command]
+fn app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+#[tauri::command]
+fn open_download_page(app: AppHandle) -> Result<(), String> {
+    app.opener()
+        .open_url(DOWNLOAD_PAGE, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
 // ---- Tray ------------------------------------------------------------------
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
@@ -533,6 +665,7 @@ pub fn run() {
             show_main(app);
         }))
         .plugin(sql)
+        .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -562,7 +695,10 @@ pub fn run() {
             private_db_url,
             sharing_supported,
             is_linked,
-            set_linked
+            set_linked,
+            check_update,
+            app_version,
+            open_download_page
         ])
         .on_window_event(|window, event| match event {
             // Click outside / focus loss hides the quick window instantly.
@@ -585,6 +721,17 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             let handle = app.handle();
+
+            app.manage(Http(
+                reqwest::Client::builder()
+                    .user_agent(concat!("Dash/", env!("CARGO_PKG_VERSION")))
+                    .https_only(true)
+                    .build()?,
+            ));
+
+            // Windows first: the hotkey and tray below may show them at once.
+            build_main(handle)?;
+            build_quick(handle)?;
 
             // Register the default global shortcut immediately so it works
             // before any webview has finished loading. A user-customised
@@ -618,4 +765,73 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Dash");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_names_cannot_escape_their_folder() {
+        assert_eq!(sanitize_file_name("../../evil.exe"), "_.._evil.exe");
+        assert_eq!(sanitize_file_name("a\\b/c:d*e?f\"g<h>i|j"), "a_b_c_d_e_f_g_h_i_j");
+        assert_eq!(sanitize_file_name("tab\there"), "tab_here");
+        assert_eq!(sanitize_file_name("  ...  "), "file");
+        assert_eq!(sanitize_file_name(""), "file");
+        assert_eq!(sanitize_file_name("..hidden.."), "hidden");
+        assert_eq!(sanitize_file_name(&"x".repeat(500)).len(), 120);
+        assert_eq!(sanitize_file_name("Grüße 2026.pdf"), "Grüße 2026.pdf");
+    }
+
+    #[test]
+    fn percent_escapes_decode_to_utf8() {
+        assert_eq!(percent_decode("Gr%C3%BC%C3%9Fe.txt"), "Grüße.txt");
+        assert_eq!(percent_decode("a%20b"), "a b");
+        // Broken escapes are kept as typed rather than dropped.
+        assert_eq!(percent_decode("100%"), "100%");
+        assert_eq!(percent_decode("%zz"), "%zz");
+        assert_eq!(percent_decode("%2"), "%2");
+    }
+
+    #[test]
+    fn attachment_ids_are_digits_and_dashes_only() {
+        assert!(valid_attachment_id("1731500000000-0"));
+        assert!(!valid_attachment_id(""));
+        assert!(!valid_attachment_id(".."));
+        assert!(!valid_attachment_id("1/../2"));
+        assert!(!valid_attachment_id("C:\\x"));
+    }
+
+    #[test]
+    fn webviews_only_show_the_apps_own_pages() {
+        assert!(is_app_url(&Url::parse("tauri://localhost/index.html").unwrap()));
+        assert!(is_app_url(&Url::parse("http://tauri.localhost/quick.html").unwrap()));
+        assert!(is_app_url(&Url::parse("https://tauri.localhost/").unwrap()));
+        assert!(!is_app_url(&Url::parse("https://evil.example/").unwrap()));
+        assert!(!is_app_url(&Url::parse("file:///C:/Windows/win.ini").unwrap()));
+        assert!(!is_app_url(&Url::parse("http://localhost:8080/").unwrap()));
+        assert!(!is_app_url(&Url::parse("javascript:alert(1)").unwrap()));
+    }
+
+    #[test]
+    fn versions_compare_numerically() {
+        assert_eq!(parse_version("v0.4.0"), Some((0, 4, 0)));
+        assert_eq!(parse_version("1.2"), None);
+        assert_eq!(parse_version("1.2.x"), None);
+        assert!(is_newer("0.10.0", "0.9.9"));
+        assert!(is_newer("1.0.0", "0.99.99"));
+        assert!(!is_newer("0.4.0", "0.4.0"));
+        assert!(!is_newer("0.3.9", "0.4.0"));
+        assert!(!is_newer("garbage", "0.4.0"));
+    }
+
+    #[test]
+    fn release_tags_are_read_strictly() {
+        let v = |j: &str| release_version(&serde_json::from_str(j).unwrap());
+        assert_eq!(v(r#"{"tag_name":"v0.4.1"}"#).as_deref(), Some("0.4.1"));
+        assert_eq!(v(r#"{"tag_name":"0.5.0"}"#).as_deref(), Some("0.5.0"));
+        assert_eq!(v(r#"{"tag_name":"nightly"}"#), None);
+        assert_eq!(v(r#"{"name":"v1.0.0"}"#), None);
+        assert_eq!(v(r#"{"tag_name":5}"#), None);
+    }
 }

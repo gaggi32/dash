@@ -16,6 +16,7 @@ import { onDbChanged, onTasksChanged } from "../lib/events";
 import { isLinked } from "../lib/link";
 import { applySavedHotkey } from "../lib/shortcut";
 import { applySavedStayOnTopFullscreen } from "../lib/topmost";
+import { autoCheck, dismissUpdate, openDownloadPage } from "../lib/updates";
 import type {
   Filter,
   Folder,
@@ -76,6 +77,8 @@ export default function App() {
   const [scope, setScope] = useState<FolderScope>("all");
   const [view, setView] = useState<View>("home");
   const [linked, setLinked] = useState(false);
+  /** A newer release found by the daily check, until the user dismisses it. */
+  const [update, setUpdate] = useState<string | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -109,6 +112,7 @@ export default function App() {
     void isLinked()
       .then(setLinked)
       .catch(() => setLinked(false));
+    void autoCheck().then(setUpdate);
   }, []);
 
   // Reload whenever the filter, sort or selected folder changes.
@@ -275,6 +279,31 @@ export default function App() {
                 </button>
               </header>
 
+              {update && (
+                <div className="mx-4 mb-3 flex items-center gap-3 rounded-lg border border-neutral-200 bg-white/70 px-3 py-2 text-[13px] sm:mx-6 dark:border-neutral-800 dark:bg-neutral-900/60">
+                  <span className="min-w-0 flex-1 truncate text-neutral-600 dark:text-neutral-300">
+                    Dash {update} is available.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void openDownloadPage()}
+                    className="shrink-0 font-medium text-neutral-900 underline-offset-2 hover:underline dark:text-neutral-100"
+                  >
+                    Download
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dismissUpdate(update);
+                      setUpdate(null);
+                    }}
+                    className="shrink-0 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
+                  >
+                    Not now
+                  </button>
+                </div>
+              )}
+
               <div className="flex items-center gap-2 px-4 pb-3 sm:px-6">
                 <div className="surface flex min-w-0 rounded-lg p-0.5">
                   {FILTERS.map((f) => (
@@ -430,7 +459,7 @@ function SettingsView({ onBack }: { onBack: () => void }) {
         <div className="leading-tight">
           <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            Hotkey, startup &amp; sharing
+            Hotkey, startup, sharing &amp; updates
           </p>
         </div>
       </header>

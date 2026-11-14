@@ -15,6 +15,13 @@ import {
   getStayOnTopFullscreen,
   setStayOnTopFullscreen,
 } from "../lib/topmost";
+import {
+  appVersion,
+  checkUpdate,
+  getCheckUpdates,
+  openDownloadPage,
+  setCheckUpdates,
+} from "../lib/updates";
 
 export default function Settings() {
   const [hotkey, setHotkeyValue] = useState(getHotkey());
@@ -328,6 +335,106 @@ export default function Settings() {
           </div>
         </>
       )}
+
+      <div className="h-px bg-neutral-200 dark:bg-neutral-800" />
+
+      <UpdatesSection />
+    </div>
+  );
+}
+
+/** Version, the daily update check switch, and a manual check. */
+function UpdatesSection() {
+  const [enabled, setEnabled] = useState(getCheckUpdates);
+  const [version, setVersion] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<
+    { kind: "newer"; latest: string } | { kind: "current" } | { kind: "error"; message: string } | null
+  >(null);
+
+  useEffect(() => {
+    appVersion()
+      .then(setVersion)
+      .catch(() => setVersion(""));
+  }, []);
+
+  const checkNow = async () => {
+    setChecking(true);
+    setResult(null);
+    try {
+      const info = await checkUpdate();
+      setResult(
+        info.newer && info.latest
+          ? { kind: "newer", latest: info.latest }
+          : { kind: "current" },
+      );
+    } catch (err) {
+      setResult({ kind: "error", message: String(err) });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <label className="flex cursor-pointer items-center gap-3">
+        <span className="relative inline-flex">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => {
+              setCheckUpdates(e.target.checked);
+              setEnabled(e.target.checked);
+            }}
+            className="peer sr-only"
+          />
+          <span className="h-6 w-10 rounded-full bg-neutral-300 ring-1 ring-inset ring-black/[0.06] transition-colors peer-checked:bg-gradient-to-b peer-checked:from-neutral-700 peer-checked:to-neutral-900 dark:bg-neutral-700 dark:ring-white/5 dark:peer-checked:from-neutral-300 dark:peer-checked:to-neutral-500" />
+          <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
+        </span>
+        <span>
+          <span className="block font-medium">Check for updates</span>
+          <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+            Once a day, asks GitHub for the newest version number. Nothing about
+            you or your tasks is sent.
+          </span>
+        </span>
+      </label>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xs text-neutral-500 dark:text-neutral-400">
+          {version ? `Dash ${version}` : "Dash"}
+        </span>
+        <button
+          type="button"
+          onClick={() => void checkNow()}
+          disabled={checking}
+          className="rounded-md bg-neutral-100 px-2.5 py-1 text-[12px] font-medium text-neutral-600 transition-colors hover:bg-neutral-200 disabled:opacity-50 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+        >
+          {checking ? "Checking…" : "Check now"}
+        </button>
+        {result?.kind === "current" && (
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">
+            You have the newest version.
+          </span>
+        )}
+        {result?.kind === "newer" && (
+          <span className="text-xs text-neutral-700 dark:text-neutral-200">
+            Dash {result.latest} is out.{" "}
+            <button
+              type="button"
+              onClick={() => void openDownloadPage()}
+              className="font-medium underline underline-offset-2"
+            >
+              Download
+            </button>
+          </span>
+        )}
+        {result?.kind === "error" && (
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">
+            {result.message}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
