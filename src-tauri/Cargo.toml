@@ -1,8 +1,8 @@
 [package]
 name = "dash"
-version = "0.3.2"
+version = "0.4.0"
 description = "Dash — quick-capture to-do app"
-authors = ["you"]
+authors = ["gaggi32"]
 edition = "2021"
 rust-version = "1.77.2"
 
