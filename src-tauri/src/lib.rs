@@ -1,7 +1,9 @@
+mod settings;
+
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -16,10 +18,10 @@ use tauri::{
 #[cfg(not(debug_assertions))]
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
-use tauri_plugin_global_shortcut::{
-    Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
-};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_sql::{Migration, MigrationKind};
+
+use settings::{Patch, Settings};
 
 /// Flag we pass to ourselves in the autostart registration. When Windows/macOS
 /// launches Dash at login it runs `Dash --hidden`, so we can stay in the tray
@@ -39,6 +41,10 @@ struct Http(reqwest::Client);
 
 /// Shared flag for the fullscreen-topmost watchdog (see [`spawn_topmost_watch`]).
 struct TopmostWatch(Arc<AtomicBool>);
+
+/// The preferences as last saved (see `settings.rs`). The lock is held across
+/// each read-change-write, so two windows saving at once cannot interleave.
+struct Prefs(Mutex<Settings>);
 
 /// While true, losing focus doesn't hide the quick-add window. The native file
 /// picker takes focus from it, and without this the window would vanish (taking
@@ -87,15 +93,6 @@ fn marker_path(app: &AppHandle) -> Result<PathBuf, String> {
 
 fn linked(app: &AppHandle) -> bool {
     marker_path(app).map(|p| p.exists()).unwrap_or(false)
-}
-
-/// Default hotkey: ⌘⇧Space on macOS, Ctrl⇧Space everywhere else.
-fn default_shortcut() -> Shortcut {
-    #[cfg(target_os = "macos")]
-    let mods = Modifiers::SUPER | Modifiers::SHIFT;
-    #[cfg(not(target_os = "macos"))]
-    let mods = Modifiers::CONTROL | Modifiers::SHIFT;
-    Shortcut::new(Some(mods), Code::Space)
 }
 
 // ---- Windows ---------------------------------------------------------------
@@ -443,26 +440,111 @@ fn set_linked(app: AppHandle, enabled: bool) -> Result<String, String> {
     Ok(db_url(app))
 }
 
-/// Re-register the global shortcut at runtime (used by the Settings panel).
+// ---- Settings --------------------------------------------------------------
+
 #[tauri::command]
-fn update_shortcut(app: AppHandle, accelerator: String) -> Result<(), String> {
-    let shortcut = Shortcut::from_str(&accelerator)
+fn get_settings(prefs: tauri::State<'_, Prefs>) -> Settings {
+    prefs.0.lock().expect("settings mutex poisoned").clone()
+}
+
+/// Change the fields in `patch`, re-apply anything with a live effect, and
+/// save. A hotkey in the patch is always registered, even an unchanged one:
+/// the recorder suspended it, and this is what puts it back.
+#[tauri::command]
+fn save_settings(
+    app: AppHandle,
+    prefs: tauri::State<'_, Prefs>,
+    patch: Patch,
+) -> Result<Settings, String> {
+    let mut current = prefs.0.lock().expect("settings mutex poisoned");
+    let mut next = current.clone();
+    patch.apply_to(&mut next);
+
+    if patch.hotkey.is_some() {
+        // A rejected accelerator must not leave the app with no hotkey at all,
+        // so put the old one back before reporting the failure.
+        if let Err(e) = register_hotkey(&app, &next.hotkey) {
+            let _ = register_hotkey(&app, &current.hotkey);
+            return Err(e);
+        }
+    }
+    if let Err(e) = settings::save(&app, &next) {
+        if patch.hotkey.is_some() {
+            let _ = register_hotkey(&app, &current.hotkey);
+        }
+        return Err(e);
+    }
+    set_topmost_watch(&app, next.stay_on_top_fullscreen);
+
+    *current = next.clone();
+    Ok(next)
+}
+
+/// One-time carry-over from 0.4.x, which kept these in localStorage. Takes only
+/// the fields the file does not mention yet, applies them like the startup
+/// does, and saves; the webview then removes its copies.
+#[tauri::command]
+fn adopt_settings(
+    app: AppHandle,
+    prefs: tauri::State<'_, Prefs>,
+    legacy: Patch,
+) -> Result<Settings, String> {
+    let mut current = prefs.0.lock().expect("settings mutex poisoned");
+    let adopted = legacy.missing_from(&settings::read_raw(&app));
+    if adopted.is_empty() {
+        return Ok(current.clone());
+    }
+
+    let mut next = current.clone();
+    adopted.apply_to(&mut next);
+    settings::save(&app, &next)?;
+    if adopted.hotkey.is_some() {
+        register_saved_hotkey(&app, &next.hotkey);
+    }
+    set_topmost_watch(&app, next.stay_on_top_fullscreen);
+
+    *current = next.clone();
+    Ok(next)
+}
+
+// ---- Hotkey and topmost ----------------------------------------------------
+
+fn register_hotkey(app: &AppHandle, accelerator: &str) -> Result<(), String> {
+    let shortcut = Shortcut::from_str(accelerator)
         .map_err(|_| format!("Could not parse accelerator '{accelerator}'"))?;
     let gs = app.global_shortcut();
     gs.unregister_all().map_err(|e| e.to_string())?;
-    gs.register(shortcut).map_err(|e| e.to_string())?;
-    Ok(())
+    gs.register(shortcut).map_err(|e| e.to_string())
+}
+
+/// The saved hotkey, or the default if the system refuses it (another app may
+/// hold the combo). The saved one stays in the file, so the next launch tries
+/// it again.
+fn register_saved_hotkey(app: &AppHandle, accelerator: &str) {
+    if let Err(e) = register_hotkey(app, accelerator) {
+        eprintln!("{e}; falling back to {}", settings::DEFAULT_HOTKEY);
+        if let Err(e) = register_hotkey(app, settings::DEFAULT_HOTKEY) {
+            eprintln!("Failed to register default global shortcut: {e}");
+        }
+    }
 }
 
 /// Temporarily release ALL global shortcuts so the webview can capture raw
 /// keystrokes while the user is recording a new binding. Without this, the OS
 /// swallows the currently-registered combo and the recorder never "sees" it.
-/// The frontend re-registers (via `update_shortcut`) when recording finishes.
+/// `save_settings` or `resume_shortcut` puts it back.
 #[tauri::command]
 fn suspend_shortcut(app: AppHandle) -> Result<(), String> {
     app.global_shortcut()
         .unregister_all()
         .map_err(|e| e.to_string())
+}
+
+/// Re-register the saved hotkey (a recording was cancelled).
+#[tauri::command]
+fn resume_shortcut(app: AppHandle, prefs: tauri::State<'_, Prefs>) -> Result<(), String> {
+    let hotkey = prefs.0.lock().expect("settings mutex poisoned").hotkey.clone();
+    register_hotkey(&app, &hotkey)
 }
 
 /// Toggle the fullscreen-topmost watchdog. `alwaysOnTop` in tauri.conf.json
@@ -471,15 +553,16 @@ fn suspend_shortcut(app: AppHandle) -> Result<(), String> {
 /// app as fullscreen the same way. Re-asserting on an interval — the same
 /// trick overlay apps like Discord's use — makes the panel come back on top
 /// within a beat instead of staying buried until the other app loses focus.
-#[tauri::command]
-fn set_topmost_watch(app: AppHandle, enabled: bool) -> Result<(), String> {
+///
+/// Driven by `Settings::stay_on_top_fullscreen`: applied at startup and by
+/// the settings commands, never by the webview directly.
+fn set_topmost_watch(app: &AppHandle, enabled: bool) {
     app.state::<TopmostWatch>().0.store(enabled, Ordering::Relaxed);
     if enabled {
         if let Some(win) = app.get_webview_window(QUICK_LABEL) {
-            win.set_always_on_top(true).map_err(|e| e.to_string())?;
+            let _ = win.set_always_on_top(true);
         }
     }
-    Ok(())
 }
 
 /// Background loop backing [`set_topmost_watch`]. Sleeps between checks so it
@@ -697,9 +780,11 @@ pub fn run() {
             hold_quick,
             hide_quick,
             open_main,
-            update_shortcut,
+            get_settings,
+            save_settings,
+            adopt_settings,
             suspend_shortcut,
-            set_topmost_watch,
+            resume_shortcut,
             db_url,
             private_db_url,
             sharing_supported,
@@ -731,6 +816,11 @@ pub fn run() {
 
             let handle = app.handle();
 
+            // Before the windows: a webview may call the settings commands as
+            // soon as it has loaded.
+            let saved = settings::load(handle);
+            app.manage(Prefs(Mutex::new(saved.clone())));
+
             app.manage(Http(
                 reqwest::Client::builder()
                     .user_agent(concat!("Dash/", env!("CARGO_PKG_VERSION")))
@@ -742,17 +832,15 @@ pub fn run() {
             build_main(handle)?;
             build_quick(handle)?;
 
-            // Register the default global shortcut immediately so it works
-            // before any webview has finished loading. A user-customised
-            // accelerator is re-applied from the frontend on launch.
-            if let Err(e) = handle.global_shortcut().register(default_shortcut()) {
-                eprintln!("Failed to register default global shortcut: {e}");
-            }
+            // Registered here, before any webview has finished loading, so the
+            // hotkey works from the moment the tray icon appears.
+            register_saved_hotkey(handle, &saved.hotkey);
 
             build_tray(handle)?;
 
             let watch_flag = app.state::<TopmostWatch>().0.clone();
             spawn_topmost_watch(handle.clone(), watch_flag);
+            set_topmost_watch(handle, saved.stay_on_top_fullscreen);
 
             // If autostart is on, re-register it so the login entry always points
             // at THIS executable, following the install if it moves (and healing
@@ -823,6 +911,19 @@ mod tests {
         assert!(!is_app_url(&Url::parse("file:///C:/Windows/win.ini").unwrap()));
         assert!(!is_app_url(&Url::parse("http://localhost:8080/").unwrap()));
         assert!(!is_app_url(&Url::parse("javascript:alert(1)").unwrap()));
+    }
+
+    #[test]
+    fn the_default_hotkey_is_the_one_startup_used_to_hard_code() {
+        use tauri_plugin_global_shortcut::{Code, Modifiers};
+        #[cfg(target_os = "macos")]
+        let mods = Modifiers::SUPER | Modifiers::SHIFT;
+        #[cfg(not(target_os = "macos"))]
+        let mods = Modifiers::CONTROL | Modifiers::SHIFT;
+        assert_eq!(
+            Shortcut::from_str(settings::DEFAULT_HOTKEY).unwrap(),
+            Shortcut::new(Some(mods), Code::Space)
+        );
     }
 
     #[test]

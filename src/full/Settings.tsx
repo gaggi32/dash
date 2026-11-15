@@ -4,33 +4,29 @@ import {
   acceleratorToKeys,
   DEFAULT_HOTKEY,
   eventToChord,
-  getHotkey,
   resumeHotkey,
   setHotkey,
   suspendHotkey,
 } from "../lib/shortcut";
 import { KeyboardIcon, UsersIcon } from "../components/icons";
 import { isLinked, setLinked, sharingSupported } from "../lib/link";
-import {
-  getStayOnTopFullscreen,
-  setStayOnTopFullscreen,
-} from "../lib/topmost";
+import { getSettings, saveSettings } from "../lib/settings";
 import {
   appVersion,
   checkUpdate,
-  getCheckUpdates,
   openDownloadPage,
   setCheckUpdates,
 } from "../lib/updates";
 
 export default function Settings() {
-  const [hotkey, setHotkeyValue] = useState(getHotkey());
+  // Empty until the saved settings arrive from Rust.
+  const [hotkey, setHotkeyValue] = useState("");
   const [recording, setRecording] = useState(false);
   // Live preview of keys held while recording (modifiers, then the final key).
   const [preview, setPreview] = useState<string>("");
   const [status, setStatus] = useState<string | null>(null);
   const [autostart, setAutostart] = useState(false);
-  const [stayOnTop, setStayOnTop] = useState(getStayOnTopFullscreen);
+  const [stayOnTop, setStayOnTop] = useState(false);
   // Account linking: whether this platform offers it, whether it's on, and a
   // line of feedback after the merge that runs on first link.
   const [sharing, setSharing] = useState(false);
@@ -43,6 +39,14 @@ export default function Settings() {
   const recordingRef = useRef(false);
 
   useEffect(() => {
+    getSettings()
+      .then((s) => {
+        // A recording may already have committed a newer binding.
+        setHotkeyValue((current) => current || s.hotkey);
+        setStayOnTop(s.stayOnTopFullscreen);
+      })
+      .catch((e) => console.error("Failed to load settings:", e));
+
     isEnabled()
       .then(setAutostart)
       .catch((e) => console.error("autostart isEnabled failed:", e));
@@ -160,8 +164,8 @@ export default function Settings() {
 
   const toggleStayOnTop = async (next: boolean) => {
     try {
-      await setStayOnTopFullscreen(next);
-      setStayOnTop(next);
+      const saved = await saveSettings({ stayOnTopFullscreen: next });
+      setStayOnTop(saved.stayOnTopFullscreen);
     } catch (err) {
       console.error("stay-on-top toggle failed:", err);
     }
@@ -241,7 +245,7 @@ export default function Settings() {
               ? "Hold modifiers + a key. Esc to cancel."
               : "Click, then press the keys you want."}
           </p>
-          {hotkey !== DEFAULT_HOTKEY && !recording && (
+          {hotkey && hotkey !== DEFAULT_HOTKEY && !recording && (
             <button
               type="button"
               onClick={() => void apply(DEFAULT_HOTKEY)}
@@ -345,7 +349,7 @@ export default function Settings() {
 
 /** Version, the daily update check switch, and a manual check. */
 function UpdatesSection() {
-  const [enabled, setEnabled] = useState(getCheckUpdates);
+  const [enabled, setEnabled] = useState(true);
   const [version, setVersion] = useState("");
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<
@@ -356,6 +360,9 @@ function UpdatesSection() {
     appVersion()
       .then(setVersion)
       .catch(() => setVersion(""));
+    getSettings()
+      .then((s) => setEnabled(s.checkUpdates))
+      .catch(() => {});
   }, []);
 
   const checkNow = async () => {
@@ -383,8 +390,12 @@ function UpdatesSection() {
             type="checkbox"
             checked={enabled}
             onChange={(e) => {
-              setCheckUpdates(e.target.checked);
-              setEnabled(e.target.checked);
+              const next = e.target.checked;
+              setEnabled(next);
+              setCheckUpdates(next).catch((err) => {
+                console.error("Failed to save the update check switch:", err);
+                setEnabled(!next);
+              });
             }}
             className="peer sr-only"
           />

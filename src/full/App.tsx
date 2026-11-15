@@ -14,8 +14,7 @@ import {
 } from "../lib/db";
 import { onDbChanged, onTasksChanged } from "../lib/events";
 import { isLinked } from "../lib/link";
-import { applySavedHotkey } from "../lib/shortcut";
-import { applySavedStayOnTopFullscreen } from "../lib/topmost";
+import { adoptLegacySettings } from "../lib/settings";
 import { autoCheck, dismissUpdate, openDownloadPage } from "../lib/updates";
 import type {
   Filter,
@@ -104,11 +103,11 @@ export default function App() {
     }
   }, [filter, sort, scope]);
 
-  // Re-apply a customised hotkey (and the fullscreen-topmost watchdog, if
-  // enabled) once on launch.
+  // Rust applies the hotkey and the fullscreen-topmost watchdog itself at
+  // startup; this window only carries 0.4.x settings over from localStorage,
+  // once (the update check below waits for it).
   useEffect(() => {
-    void applySavedHotkey();
-    void applySavedStayOnTopFullscreen();
+    void adoptLegacySettings();
     void isLinked()
       .then(setLinked)
       .catch(() => setLinked(false));
@@ -294,7 +293,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      dismissUpdate(update);
+                      void dismissUpdate(update);
                       setUpdate(null);
                     }}
                     className="shrink-0 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"

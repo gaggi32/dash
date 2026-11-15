@@ -31,6 +31,10 @@ the PC.
 ## Layout
 - `src-tauri/src/lib.rs` windows (built in Rust behind a navigation guard),
   tray, hotkey, attachments, account linking, update check, every command.
+- `src-tauri/src/settings.rs` `settings.json` (hotkey, switches), written
+  tmp + rename; `src/lib/settings.ts` its commands and the one-time carry-over
+  from localStorage. Never keep a user setting in localStorage: WebView2 drops
+  recent writes when the tray app is killed at a restart.
 - `src/lib/db.ts` all SQL (tauri-plugin-sql); `link.ts` the one-time merge
   into the shared database; `updates.ts` the update check schedule.
 - `src/quick/` the hotkey window; `src/full/` the main window.

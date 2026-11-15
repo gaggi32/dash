@@ -1,27 +1,22 @@
 import { invoke } from "@tauri-apps/api/core";
+import { saveSettings } from "./settings";
 
 /**
  * Global hotkey configuration.
  *
- * The default accelerator is registered in Rust at startup so the shortcut
- * works immediately (even before any webview has loaded). The user can change
- * it from the full window; we persist the choice in localStorage and re-apply
- * it on launch via `applySavedHotkey()`.
+ * Rust registers the saved accelerator (or the default) at startup, so the
+ * shortcut works before any webview has loaded. The user can change it from
+ * the full window; the choice is saved in the settings file and re-registered
+ * by Rust in the same step.
  *
  * Accelerator format is Tauri's: e.g. "CommandOrControl+Shift+Space",
  * "Alt+N", "Super+T". `CommandOrControl` maps to ⌘ on macOS, Ctrl elsewhere.
  */
 export const DEFAULT_HOTKEY = "CommandOrControl+Shift+Space";
-const STORAGE_KEY = "dash.hotkey";
-
-export function getHotkey(): string {
-  return localStorage.getItem(STORAGE_KEY) || DEFAULT_HOTKEY;
-}
 
 export async function setHotkey(accelerator: string): Promise<void> {
   // Throws (rejects) if Rust fails to parse/register — caller surfaces it.
-  await invoke("update_shortcut", { accelerator });
-  localStorage.setItem(STORAGE_KEY, accelerator);
+  await saveSettings({ hotkey: accelerator });
 }
 
 /**
@@ -39,21 +34,9 @@ export async function suspendHotkey(): Promise<void> {
 /** Re-register the currently saved hotkey (used to cancel/abort a recording). */
 export async function resumeHotkey(): Promise<void> {
   try {
-    await invoke("update_shortcut", { accelerator: getHotkey() });
+    await invoke("resume_shortcut");
   } catch (err) {
     console.error("Failed to resume global shortcut:", err);
-  }
-}
-
-/** Re-register a previously customised hotkey. Safe to call on every launch. */
-export async function applySavedHotkey(): Promise<void> {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved && saved !== DEFAULT_HOTKEY) {
-    try {
-      await invoke("update_shortcut", { accelerator: saved });
-    } catch (err) {
-      console.error("Failed to re-apply saved hotkey:", err);
-    }
   }
 }
 
