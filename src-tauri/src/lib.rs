@@ -13,6 +13,7 @@ use tauri::{
     AppHandle, Emitter, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
     WindowEvent,
 };
+#[cfg(not(debug_assertions))]
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_global_shortcut::{
@@ -658,7 +659,7 @@ pub fn run() {
         builder.build()
     };
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         // single-instance MUST be the first plugin registered.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             // A second launch just surfaces the existing instance.
@@ -674,11 +675,19 @@ pub fn run() {
                     }
                 })
                 .build(),
-        )
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            Some(vec![AUTOSTART_FLAG]),
-        ))
+        );
+
+    // Release builds only. The login entry is one per app name, not per
+    // identifier, so a dev build that could touch it would point the real
+    // install's entry at a debug exe — which opens a console at every login,
+    // or does nothing once that exe is gone.
+    #[cfg(not(debug_assertions))]
+    let builder = builder.plugin(tauri_plugin_autostart::init(
+        tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+        Some(vec![AUTOSTART_FLAG]),
+    ));
+
+    builder
         .manage(TopmostWatch(Arc::new(AtomicBool::new(false))))
         .manage(HoldQuick(Arc::new(AtomicBool::new(false))))
         .invoke_handler(tauri::generate_handler![
@@ -746,11 +755,14 @@ pub fn run() {
             spawn_topmost_watch(handle.clone(), watch_flag);
 
             // If autostart is on, re-register it so the login entry always points
-            // at THIS executable. This heals a stale path left behind by a dev
-            // build (which would open a console and fail to reach the dev server).
-            let autostart = app.autolaunch();
-            if autostart.is_enabled().unwrap_or(false) {
-                let _ = autostart.enable();
+            // at THIS executable, following the install if it moves (and healing
+            // one left on a dev build by an older version).
+            #[cfg(not(debug_assertions))]
+            {
+                let autostart = app.autolaunch();
+                if autostart.is_enabled().unwrap_or(false) {
+                    let _ = autostart.enable();
+                }
             }
 
             // Launched at login (`--hidden`) → stay in the tray. Any other launch
