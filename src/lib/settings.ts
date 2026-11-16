@@ -20,6 +20,8 @@ export interface Settings {
   dismissedUpdate: string;
   /** Folder the main window last showed: "all", "unfiled" or a folder id. */
   lastScope: string;
+  /** Version whose "What's new" was seen; "" until the main window sets it. */
+  lastSeenVersion: string;
 }
 
 /** Index signature so `invoke` accepts it inside its argument record. */

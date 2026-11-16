@@ -1,0 +1,64 @@
+# Changelog
+
+All notable changes to Dash. Versions from 0.4.0 on match the GitHub releases.
+
+## [0.4.2] — 2026-11-16
+### Added
+- "What's new": after an update, the main window shows what changed since the version you had.
+### Changed
+- The release pages on GitHub list the changes from this changelog.
+
+## [0.4.1] — 2026-11-16
+### Fixed
+- Windows: the quick-add panel no longer freezes on its first frame when it opens over the main window.
+
+## [0.4.0] — 2026-11-16
+### Added
+- Attach files to a task's notes: pick them, drop them in or paste them.
+- Update check once a day, with a switch and "Check now" in Settings and a small notice when a new version is out.
+- The main window opens on the folder you had open last.
+- Downloads for Windows (x64) and macOS (Apple Silicon and Intel, macOS 11 or later), each with a SHA-256 checksum.
+### Changed
+- Leaving the "Next week" view goes back to Active instead of All.
+- The windows only ever show Dash's own pages.
+### Fixed
+- Notes typed in the main window's composer are saved with the new task instead of being lost.
+- The hotkey, "Stay on top of fullscreen apps" and the update switch no longer reset themselves after a PC restart.
+- "Next week" covers the whole of next week, not just the next 7 days.
+
+## [0.3.2] — 2026-09-21
+### Added
+- Add notes while creating a task, in the quick-add window and in the main window.
+
+## [0.3.1] — 2026-09-18
+### Added
+- Notes on tasks: a sidebar on the right that saves as you type; the first line shows under the task title.
+- "Stay on top of fullscreen apps" for the quick-add window.
+- In a narrow window the folders slide in from a menu button.
+### Changed
+- The list opens on Active tasks.
+### Fixed
+- A task deleted while accounts are linked no longer comes back after linking again.
+
+## [0.3.0] — 2026-08-25
+### Added
+- Folders: file tasks into named folders, browse them from a sidebar, pick one in the composer or on each task, and move several tasks at once with multi-select. Deleting a folder asks first and keeps its tasks.
+- Account linking in Settings: the accounts on this computer share one task list; this account's tasks are merged in the first time.
+- A "Next week" view in the sort menu.
+### Changed
+- New app icon and a neutral graphite look, light and dark.
+- The calendar starts weeks on Monday, and tasks are sorted by due date by default.
+- The quick-add window is frosted glass again, with its fluid entrance.
+
+## [0.2.0] — 2026-07-17
+### Added
+- The installer can install Dash for everyone on this computer.
+### Changed
+- Started at login, Dash stays in the tray instead of opening its window.
+- New icons throughout.
+### Fixed
+- Start at login keeps pointing at the current copy of Dash.
+
+## [0.1.0] — 2026-06-29
+### Added
+- First release: a to-do list in the tray, a global hotkey that opens a quick-add window from anywhere, due dates, and a main window to filter, sort, edit and complete tasks.

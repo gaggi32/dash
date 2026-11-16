@@ -14,8 +14,10 @@ import {
 } from "../lib/db";
 import { onDbChanged, onTasksChanged } from "../lib/events";
 import { isLinked } from "../lib/link";
+import { planWhatsNew, type ChangelogEntry } from "../lib/changelog";
+import { RELEASES } from "../lib/releases";
 import { adoptLegacySettings, getSettings, saveSettings } from "../lib/settings";
-import { autoCheck, dismissUpdate, openDownloadPage } from "../lib/updates";
+import { appVersion, autoCheck, dismissUpdate, openDownloadPage } from "../lib/updates";
 import type {
   Filter,
   Folder,
@@ -45,6 +47,7 @@ import Settings from "./Settings";
 import SortMenu from "./SortMenu";
 import TaskComposer from "./TaskComposer";
 import TaskRow from "./TaskRow";
+import WhatsNew from "./WhatsNew";
 
 type View = "home" | "settings";
 
@@ -83,6 +86,12 @@ export default function App() {
   const [linked, setLinked] = useState(false);
   /** A newer release found by the daily check, until the user dismisses it. */
   const [update, setUpdate] = useState<string | null>(null);
+  /** CHANGELOG.md entries since the version last seen, until "Got it". */
+  const [news, setNews] = useState<{
+    version: string;
+    entries: ChangelogEntry[];
+    more: boolean;
+  } | null>(null);
   const [navOpen, setNavOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -129,6 +138,21 @@ export default function App() {
       .finally(() => {
         scopeRestored.current = true;
       });
+  }, []);
+
+  // What's new since the version last seen. That version is kept in
+  // settings.json, never localStorage (lost when the tray app is killed).
+  useEffect(() => {
+    void Promise.all([getSettings(), appVersion()])
+      .then(([s, running]) => {
+        const plan = planWhatsNew(RELEASES, s.lastSeenVersion, running);
+        if (plan.kind === "show") {
+          setNews({ version: running, entries: plan.entries, more: plan.more });
+        }
+        // A fresh install, or an update from before the card: no history.
+        if (plan.kind === "remember") return markSeen(running);
+      })
+      .catch((err) => console.error("Failed to read the version seen:", err));
   }, []);
 
   useEffect(() => {
@@ -188,6 +212,14 @@ export default function App() {
       window.removeEventListener("focus", onFocus);
     };
   }, [linked, reload]);
+
+  const markSeen = async (version: string) => {
+    try {
+      await saveSettings({ lastSeenVersion: version });
+    } catch (err) {
+      console.error("Failed to remember the version seen:", err);
+    }
+  };
 
   const removeFolder = async (id: number) => {
     await deleteFolder(id);
@@ -332,6 +364,18 @@ export default function App() {
                     Not now
                   </button>
                 </div>
+              )}
+
+              {news && (
+                <WhatsNew
+                  version={news.version}
+                  entries={news.entries}
+                  more={news.more}
+                  onDone={() => {
+                    void markSeen(news.version);
+                    setNews(null);
+                  }}
+                />
               )}
 
               <div className="flex items-center gap-2 px-4 pb-3 sm:px-6">

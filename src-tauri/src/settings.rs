@@ -44,6 +44,9 @@ pub struct Settings {
     /// The folder the main window last showed: "all", "unfiled" or a folder
     /// id, so it opens there again.
     pub last_scope: String,
+    /// The version whose "What's new" the user has seen (or that was running
+    /// when the field first appeared). Empty until the main window sets it.
+    pub last_seen_version: String,
 }
 
 impl Default for Settings {
@@ -54,6 +57,7 @@ impl Default for Settings {
             check_updates: true,
             dismissed_update: String::new(),
             last_scope: "all".into(),
+            last_seen_version: String::new(),
         }
     }
 }
@@ -74,6 +78,8 @@ pub struct Patch {
     pub dismissed_update: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_scope: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_seen_version: Option<String>,
 }
 
 impl Patch {
@@ -92,6 +98,9 @@ impl Patch {
         }
         if let Some(v) = &self.last_scope {
             settings.last_scope = v.clone();
+        }
+        if let Some(v) = &self.last_seen_version {
+            settings.last_seen_version = v.clone();
         }
     }
 
@@ -188,6 +197,7 @@ mod tests {
         assert!(s.check_updates);
         assert_eq!(s.dismissed_update, "");
         assert_eq!(s.last_scope, "all");
+        assert_eq!(s.last_seen_version, "");
     }
 
     #[test]
@@ -204,9 +214,17 @@ mod tests {
             check_updates: false,
             dismissed_update: "0.5.0".into(),
             last_scope: "12".into(),
+            last_seen_version: "0.4.1".into(),
         };
         let json = serde_json::to_string_pretty(&s).unwrap();
-        for key in ["hotkey", "stayOnTopFullscreen", "checkUpdates", "dismissedUpdate", "lastScope"] {
+        for key in [
+            "hotkey",
+            "stayOnTopFullscreen",
+            "checkUpdates",
+            "dismissedUpdate",
+            "lastScope",
+            "lastSeenVersion",
+        ] {
             assert!(json.contains(key), "{json}");
         }
         assert_eq!(parse(fields(&json)), s);
@@ -242,6 +260,25 @@ mod tests {
     }
 
     #[test]
+    fn a_file_from_before_the_whats_new_card_has_seen_nothing() {
+        // Empty means "nothing seen yet": the main window then records the
+        // running version without showing a card.
+        let s = parse(fields(r#"{ "hotkey": "Alt+N", "lastScope": "unfiled" }"#));
+        assert_eq!(s.last_seen_version, "");
+        assert_eq!(s.last_scope, "unfiled");
+    }
+
+    #[test]
+    fn a_patch_records_the_version_seen_and_keeps_the_rest() {
+        let mut s = Settings { hotkey: "Alt+N".into(), ..Settings::default() };
+        let patch: Patch = serde_json::from_str(r#"{ "lastSeenVersion": "0.4.1" }"#).unwrap();
+        patch.apply_to(&mut s);
+        assert_eq!(s.last_seen_version, "0.4.1");
+        assert_eq!(s.hotkey, "Alt+N");
+        assert_eq!(s.last_scope, "all");
+    }
+
+    #[test]
     fn the_carry_over_fills_only_what_the_file_lacks() {
         let legacy = Patch {
             hotkey: Some("Alt+N".into()),
@@ -249,6 +286,7 @@ mod tests {
             check_updates: Some(false),
             dismissed_update: None,
             last_scope: None,
+            last_seen_version: None,
         };
 
         // No file yet: everything localStorage had comes across.

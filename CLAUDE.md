@@ -38,6 +38,10 @@ the PC.
 - `src/lib/db.ts` all SQL (tauri-plugin-sql); `link.ts` the one-time merge
   into the shared database; `updates.ts` the update check schedule.
 - `src/quick/` the hotkey window; `src/full/` the main window.
+- `CHANGELOG.md` bundled with `?raw` (`src/lib/releases.ts`), parsed by
+  `src/lib/changelog.ts` for the main window's "What's new" card
+  (`src/full/WhatsNew.tsx`), shown once after an update; `lastSeenVersion` in
+  `settings.json` remembers what was seen.
 
 ## Conventions
 - Data stays in `tauri-plugin-sql` (not a Rust-owned rusqlite like
@@ -57,18 +61,28 @@ the PC.
 - Version lives in three places: `package.json`, `src-tauri/tauri.conf.json`,
   `src-tauri/Cargo.toml`. The release job refuses a tag that does not match all
   three.
-- The update check reads `api.github.com/repos/gaggi32/dash/releases/latest`
-  (no token), so it needs the repo to be public.
+- The repo is private (Michele's decision, 2026-11-16). The update check reads
+  `api.github.com/repos/gaggi32/dash/releases/latest` without a token, so it
+  can't see the releases: installs and updates are by hand from the release
+  page, while signed in. No in-app updater for the same reason.
 
 ## Releasing
-Bump the three versions, commit, tag `vX.Y.Z`, push the tag.
+Every release first adds its section to `CHANGELOG.md`:
+`## [X.Y.Z] — YYYY-MM-DD`, then `### Added / Changed / Fixed / Removed`, one
+line per change a user would notice (not internal names), checked against
+`git log --no-merges <last tag>..HEAD`. That section is the GitHub release
+notes and the in-app "What's new" card; the release job refuses a tag without
+one, and `npm test` fails when `package.json`'s version has none.
+Then bump the three versions, commit, tag `vX.Y.Z`, push the tag.
 `.github/workflows/release.yml` tests, builds Windows x64 + macOS arm64/x64,
-uploads installers and `.sha256` files to a draft release and publishes it in
-the protected `release` environment. macOS runners sometimes never start:
-rerun the failed jobs.
+uploads installers and `.sha256` files to a draft release and publishes it (no
+`release` environment exists, so the publish job runs unprotected). Actions
+minutes on a private repo count against the free quota, macOS ones x10.
+macOS runners sometimes never start: rerun the failed jobs.
 
 ## Only Michele can do
-- Keep the repo public (update check, free Actions minutes).
-- Create the `release` environment on GitHub (Settings → Environments,
-  deployment tags `v*`).
+- Install each release by hand (signed in to GitHub): the repo stays private,
+  so the app can't offer it.
+- Optional: a `release` environment (Settings → Environments, deployment tags
+  `v*`) to protect the publish step.
 - Code signing certificates (Apple Developer ID, Windows signing) if wanted.
