@@ -41,6 +41,9 @@ pub struct Settings {
     /// The release whose notice the user dismissed with "Not now"; a later one
     /// shows it again. Empty when none was.
     pub dismissed_update: String,
+    /// The folder the main window last showed: "all", "unfiled" or a folder
+    /// id, so it opens there again.
+    pub last_scope: String,
 }
 
 impl Default for Settings {
@@ -50,6 +53,7 @@ impl Default for Settings {
             stay_on_top_fullscreen: false,
             check_updates: true,
             dismissed_update: String::new(),
+            last_scope: "all".into(),
         }
     }
 }
@@ -68,6 +72,8 @@ pub struct Patch {
     pub check_updates: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dismissed_update: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_scope: Option<String>,
 }
 
 impl Patch {
@@ -83,6 +89,9 @@ impl Patch {
         }
         if let Some(v) = &self.dismissed_update {
             settings.dismissed_update = v.clone();
+        }
+        if let Some(v) = &self.last_scope {
+            settings.last_scope = v.clone();
         }
     }
 
@@ -178,6 +187,7 @@ mod tests {
         assert!(!s.stay_on_top_fullscreen);
         assert!(s.check_updates);
         assert_eq!(s.dismissed_update, "");
+        assert_eq!(s.last_scope, "all");
     }
 
     #[test]
@@ -193,9 +203,10 @@ mod tests {
             stay_on_top_fullscreen: true,
             check_updates: false,
             dismissed_update: "0.5.0".into(),
+            last_scope: "12".into(),
         };
         let json = serde_json::to_string_pretty(&s).unwrap();
-        for key in ["hotkey", "stayOnTopFullscreen", "checkUpdates", "dismissedUpdate"] {
+        for key in ["hotkey", "stayOnTopFullscreen", "checkUpdates", "dismissedUpdate", "lastScope"] {
             assert!(json.contains(key), "{json}");
         }
         assert_eq!(parse(fields(&json)), s);
@@ -237,6 +248,7 @@ mod tests {
             stay_on_top_fullscreen: Some(true),
             check_updates: Some(false),
             dismissed_update: None,
+            last_scope: None,
         };
 
         // No file yet: everything localStorage had comes across.

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import Database from "@tauri-apps/plugin-sql";
-import { daysFromTodayISO, todayISO } from "./date";
+import { endOfNextWeekISO, todayISO } from "./date";
 import { discardAttachments, parseAttachments } from "./attachments";
 import { notifyChange } from "./events";
 import type {
@@ -112,7 +112,7 @@ export async function listTasks(
     clauses.push("completed = 0");
     args.push(todayISO());
     clauses.push(`due_date >= $${args.length}`);
-    args.push(daysFromTodayISO(7));
+    args.push(endOfNextWeekISO());
     clauses.push(`due_date <= $${args.length}`);
   }
 
@@ -284,7 +284,7 @@ export async function countTasks(filter: Filter): Promise<FolderCounts> {
       : filter === "completed"
         ? "WHERE completed = 1"
         : filter === "nextWeek"
-          ? `WHERE completed = 0 AND due_date >= '${todayISO()}' AND due_date <= '${daysFromTodayISO(7)}'`
+          ? `WHERE completed = 0 AND due_date >= '${todayISO()}' AND due_date <= '${endOfNextWeekISO()}'`
           : "";
 
   const rows = await d.select<{ folder_id: number | null; n: number }[]>(

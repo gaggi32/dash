@@ -18,6 +18,8 @@ export interface Settings {
   checkUpdates: boolean;
   /** Release whose notice was dismissed with "Not now"; empty when none. */
   dismissedUpdate: string;
+  /** Folder the main window last showed: "all", "unfiled" or a folder id. */
+  lastScope: string;
 }
 
 /** Index signature so `invoke` accepts it inside its argument record. */

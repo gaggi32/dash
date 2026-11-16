@@ -45,6 +45,13 @@ export type SortKey = "created" | "due";
  */
 export type FolderScope = "all" | "unfiled" | number;
 
+/** A scope as settings.json keeps it ("all", "unfiled", "12"); anything else is "all". */
+export function scopeFrom(saved: string): FolderScope {
+  if (saved === "unfiled") return "unfiled";
+  const id = Number(saved);
+  return Number.isInteger(id) && id > 0 ? id : "all";
+}
+
 /** Per-row task counts backing the sidebar badges. */
 export interface FolderCounts {
   all: number;

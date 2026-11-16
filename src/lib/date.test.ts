@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   daysFromTodayISO,
+  endOfNextWeekISO,
   formatDue,
   isOverdue,
   parseISODate,
@@ -52,5 +53,35 @@ describe("relative to today", () => {
     expect(isOverdue("2026-12-31")).toBe(false);
     expect(isOverdue("2027-01-01")).toBe(false);
     expect(isOverdue(null)).toBe(false);
+  });
+});
+
+describe("next week", () => {
+  // 2026-11-16 is a Monday.
+  const day = (d: number) => new Date(2026, 10, d, 15, 30);
+
+  it("runs to the Sunday that ends next week", () => {
+    expect(endOfNextWeekISO(day(16))).toBe("2026-11-29"); // Monday: 13 days
+    expect(endOfNextWeekISO(day(19))).toBe("2026-11-29"); // Thursday
+    expect(endOfNextWeekISO(day(21))).toBe("2026-11-29"); // Saturday
+    expect(endOfNextWeekISO(day(22))).toBe("2026-11-29"); // Sunday: the coming week
+    expect(endOfNextWeekISO(day(23))).toBe("2026-12-06"); // the Monday after
+  });
+
+  it("crosses a month and a year", () => {
+    expect(endOfNextWeekISO(new Date(2026, 11, 30))).toBe("2027-01-10"); // Wednesday
+  });
+});
+
+describe("the folder last open", () => {
+  it("reads what settings.json keeps, and falls back to all", async () => {
+    const { scopeFrom } = await import("./types");
+    expect(scopeFrom("all")).toBe("all");
+    expect(scopeFrom("unfiled")).toBe("unfiled");
+    expect(scopeFrom("12")).toBe(12);
+    expect(scopeFrom("")).toBe("all");
+    expect(scopeFrom("-3")).toBe("all");
+    expect(scopeFrom("1.5")).toBe("all");
+    expect(scopeFrom("nonsense")).toBe("all");
   });
 });

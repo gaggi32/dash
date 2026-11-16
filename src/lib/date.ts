@@ -23,6 +23,18 @@ export function daysFromTodayISO(days: number): string {
   return toISODate(d);
 }
 
+/**
+ * ISO date of the Sunday that ends next week (weeks run Monday to Sunday), so
+ * "next week" covers what is left of this week and the whole of the next one.
+ * On a Monday that is 13 days ahead; on a Sunday, 7.
+ */
+export function endOfNextWeekISO(now: Date = new Date()): string {
+  const d = new Date(now);
+  const toSunday = (7 - d.getDay()) % 7;
+  d.setDate(d.getDate() + toSunday + 7);
+  return toISODate(d);
+}
+
 export function sameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&

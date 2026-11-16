@@ -14,7 +14,7 @@ import {
 } from "../lib/db";
 import { onDbChanged, onTasksChanged } from "../lib/events";
 import { isLinked } from "../lib/link";
-import { adoptLegacySettings } from "../lib/settings";
+import { adoptLegacySettings, getSettings, saveSettings } from "../lib/settings";
 import { autoCheck, dismissUpdate, openDownloadPage } from "../lib/updates";
 import type {
   Filter,
@@ -24,6 +24,7 @@ import type {
   SortKey,
   Task,
 } from "../lib/types";
+import { scopeFrom } from "../lib/types";
 import DashMark from "../components/DashMark";
 import {
   ArchiveIcon,
@@ -74,6 +75,10 @@ export default function App() {
   const [filter, setFilter] = useState<Filter>("active");
   const [sort, setSort] = useState<SortKey>("due");
   const [scope, setScope] = useState<FolderScope>("all");
+  /** Set once the folder last open has been read, so the "all" before it isn't saved over it. */
+  const scopeRestored = useRef(false);
+  /** Set by the first reload, so an empty folder list means "no folders", not "not loaded yet". */
+  const [foldersLoaded, setFoldersLoaded] = useState(false);
   const [view, setView] = useState<View>("home");
   const [linked, setLinked] = useState(false);
   /** A newer release found by the daily check, until the user dismisses it. */
@@ -97,6 +102,7 @@ export default function App() {
       ]);
       setTasks((prev) => keepIfSame(prev, t));
       setFolders((prev) => keepIfSame(prev, f));
+      setFoldersLoaded(true);
       setCounts((prev) => keepIfSame(prev, c));
     } catch (err) {
       console.error("Failed to load tasks:", err);
@@ -113,6 +119,31 @@ export default function App() {
       .catch(() => setLinked(false));
     void autoCheck().then(setUpdate);
   }, []);
+
+  // Open on the folder last open, which settings.json keeps (not localStorage,
+  // which WebView2 loses the latest writes of when the app is killed).
+  useEffect(() => {
+    void getSettings()
+      .then((s) => setScope(scopeFrom(s.lastScope)))
+      .catch((err) => console.error("Failed to read the last folder:", err))
+      .finally(() => {
+        scopeRestored.current = true;
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!scopeRestored.current) return;
+    void saveSettings({ lastScope: String(scope) }).catch((err) =>
+      console.error("Failed to remember the folder:", err),
+    );
+  }, [scope]);
+
+  // The folder last open was deleted (here, or by a linked account).
+  useEffect(() => {
+    if (foldersLoaded && typeof scope === "number" && !folders.some((f) => f.id === scope)) {
+      setScope("all");
+    }
+  }, [foldersLoaded, folders, scope]);
 
   // Reload whenever the filter, sort or selected folder changes.
   useEffect(() => {
@@ -347,7 +378,7 @@ export default function App() {
                         setFilter("nextWeek");
                       } else {
                         setSort(v);
-                        if (filter === "nextWeek") setFilter("all");
+                        if (filter === "nextWeek") setFilter("active");
                       }
                     }}
                   />
