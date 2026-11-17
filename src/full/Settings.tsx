@@ -11,8 +11,8 @@ import {
 import { KeyboardIcon, UsersIcon } from "../components/icons";
 import { isLinked, setLinked, sharingSupported } from "../lib/link";
 import { getSettings, saveSettings } from "../lib/settings";
-import { parseReleaseNotes, type ChangelogSection } from "../lib/changelog";
-import { ChangeSections } from "./WhatsNew";
+import { missedEntries, type ChangelogEntry } from "../lib/changelog";
+import { ReleaseEntries } from "./WhatsNew";
 import {
   appVersion,
   checkUpdate,
@@ -393,7 +393,7 @@ function UpdatesSection() {
   const [installing, setInstalling] = useState<number | null>(null);
   const [installError, setInstallError] = useState<string | null>(null);
   const [result, setResult] = useState<
-    | { kind: "newer"; latest: string; notes: ChangelogSection[] }
+    | { kind: "newer"; latest: string; notes: ChangelogEntry[] }
     | { kind: "current" }
     | { kind: "error"; message: string }
     | null
@@ -428,7 +428,7 @@ function UpdatesSection() {
       const info = await checkUpdate();
       setResult(
         info.newer && info.latest
-          ? { kind: "newer", latest: info.latest, notes: parseReleaseNotes(info.notes) }
+          ? { kind: "newer", latest: info.latest, notes: missedEntries(info.missed) }
           : { kind: "current" },
       );
     } catch (err) {
@@ -461,8 +461,8 @@ function UpdatesSection() {
         <span>
           <span className="block font-medium">Check for updates</span>
           <span className="block text-xs text-neutral-500 dark:text-neutral-400">
-            Once a day, asks GitHub for the newest version and what is new in
-            it. Nothing about you or your tasks is sent, and nothing is
+            Once a day, asks GitHub for the newest version and what is new since
+            yours. Nothing about you or your tasks is sent, and nothing is
             downloaded until you press Install.
           </span>
         </span>
@@ -525,10 +525,12 @@ function UpdatesSection() {
             id="update-notes-title"
             className="font-medium text-neutral-900 dark:text-neutral-100"
           >
-            What's new in {result.latest}
+            {result.notes.length > 1 && version
+              ? `What's new since ${version}`
+              : `What's new in ${result.latest}`}
           </h3>
-          <div className="tidy-scroll mt-0.5 max-h-56 overflow-y-auto pr-1">
-            <ChangeSections sections={result.notes} />
+          <div className="tidy-scroll mt-0.5 max-h-56 space-y-2 overflow-y-auto pr-1">
+            <ReleaseEntries entries={result.notes} />
           </div>
           <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
             Install downloads it from GitHub, checks it is signed by Dash,

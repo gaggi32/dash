@@ -15,9 +15,6 @@ interface Props {
  * notice and styled like it. Never in the quick-add window.
  */
 export default function WhatsNew({ version, entries, more, onDone }: Props) {
-  // One version needs no sub-heading; the title already names it.
-  const several = entries.length > 1;
-
   return (
     <section
       aria-labelledby="whats-new-title"
@@ -40,22 +37,7 @@ export default function WhatsNew({ version, entries, more, onDone }: Props) {
       </div>
 
       <div className="tidy-scroll mt-1.5 max-h-40 space-y-2 overflow-y-auto pr-1">
-        {entries.map((entry) => (
-          <div key={entry.version}>
-            {several && (
-              <p className="text-[12px] font-semibold text-neutral-700 dark:text-neutral-200">
-                {entry.version}
-                {entry.date && (
-                  <span className="font-normal text-neutral-400 dark:text-neutral-500">
-                    {" "}
-                    · {entry.date}
-                  </span>
-                )}
-              </p>
-            )}
-            <ChangeSections sections={entry.sections} />
-          </div>
-        ))}
+        <ReleaseEntries entries={entries} />
         {more && (
           <p className="text-[12px] text-neutral-400 dark:text-neutral-500">
             …and earlier changes.
@@ -63,6 +45,36 @@ export default function WhatsNew({ version, entries, more, onDone }: Props) {
         )}
       </div>
     </section>
+  );
+}
+
+/**
+ * Versions newest first, each under a small version heading with its
+ * sections: on the card, and for every release an update brings before it is
+ * installed (notice and Settings). One version needs no heading; the title
+ * around it already names it. Put it in a `space-y-2` box.
+ */
+export function ReleaseEntries({ entries }: { entries: ChangelogEntry[] }) {
+  const several = entries.length > 1;
+  return (
+    <>
+      {entries.map((entry) => (
+        <div key={entry.version}>
+          {several && (
+            <p className="text-[12px] font-semibold text-neutral-700 dark:text-neutral-200">
+              {entry.version}
+              {entry.date && (
+                <span className="font-normal text-neutral-400 dark:text-neutral-500">
+                  {" "}
+                  · {entry.date}
+                </span>
+              )}
+            </p>
+          )}
+          <ChangeSections sections={entry.sections} />
+        </div>
+      ))}
+    </>
   );
 }
 

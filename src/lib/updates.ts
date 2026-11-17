@@ -1,10 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import type { MissedRelease } from "./changelog";
 import { getSettings, saveSettings } from "./settings";
 
 /**
  * Update check. Rust asks GitHub for the newest published release of Dash and
- * returns only its version and notes (what is new in it). Installing is
+ * returns only versions and notes (what is new in each release since the
+ * running one). Installing is
  * either in the app (installUpdate: Tauri's updater downloads the release,
  * checks it is signed with Dash's release key, installs it and restarts) or
  * the user's own download from the releases page. Nothing else leaves the computer.
@@ -13,14 +15,18 @@ export interface UpdateInfo {
   current: string;
   latest: string | null;
   newer: boolean;
-  /** The release's notes (its CHANGELOG.md section), read with parseReleaseNotes. */
-  notes: string | null;
+  /**
+   * Every release the update brings, newest first, each with its notes (its
+   * CHANGELOG.md section); read with missedEntries. Empty when not newer.
+   */
+  missed: MissedRelease[];
 }
 
 /** A newer release worth telling the user about. */
 export interface FoundUpdate {
   version: string;
-  notes: string | null;
+  /** The releases it brings, as in {@link UpdateInfo}. */
+  missed: MissedRelease[];
 }
 
 /**
@@ -109,7 +115,7 @@ export async function autoCheck(now = Date.now()): Promise<FoundUpdate | null> {
     write(LAST_KEY, String(now));
     if (!info.newer || !info.latest) return null;
     if (settings.dismissedUpdate === info.latest) return null;
-    return { version: info.latest, notes: info.notes };
+    return { version: info.latest, missed: info.missed };
   } catch {
     // Offline, or no public release yet (or the settings unreachable): say
     // nothing, try again next launch.

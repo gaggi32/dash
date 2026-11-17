@@ -21,6 +21,14 @@ export interface ChangelogEntry {
   sections: ChangelogSection[];
 }
 
+/** One release an update brings, as `check_update` returns it in `missed`. */
+export interface MissedRelease {
+  /** "x.y.z". */
+  version: string;
+  /** Its GitHub release body (read with {@link parseReleaseNotes}), or null. */
+  notes: string | null;
+}
+
 /** At most this many versions on the card; older ones become one line. */
 export const WHATS_NEW_CAP = 3;
 
@@ -95,6 +103,28 @@ export function parseReleaseNotes(notes: string | null | undefined): ChangelogSe
     addLine(sections, line);
   }
   return filled(sections);
+}
+
+/**
+ * The releases an update brings, as entries laid out like the card's: each
+ * version with its parsed notes, newest first. Anything not shaped like
+ * `check_update`'s `missed`, a version that is not x.y.z, a repeat, or notes
+ * with no sections are left out.
+ */
+export function missedEntries(missed: unknown): ChangelogEntry[] {
+  if (!Array.isArray(missed)) return [];
+  const seen = new Set<string>();
+  const entries: ChangelogEntry[] = [];
+  for (const m of missed) {
+    if (typeof m !== "object" || m === null) continue;
+    const { version, notes } = m as Record<string, unknown>;
+    if (typeof version !== "string" || !parts(version) || seen.has(version)) continue;
+    const sections = parseReleaseNotes(typeof notes === "string" ? notes : null);
+    if (sections.length === 0) continue;
+    seen.add(version);
+    entries.push({ version, date: "", sections });
+  }
+  return entries.sort((a, b) => compareVersions(b.version, a.version) ?? 0);
 }
 
 function parts(v: string): [number, number, number] | null {

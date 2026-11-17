@@ -14,7 +14,7 @@ import {
 } from "../lib/db";
 import { onDbChanged, onTasksChanged } from "../lib/events";
 import { isLinked } from "../lib/link";
-import { parseReleaseNotes, planWhatsNew, type ChangelogEntry } from "../lib/changelog";
+import { missedEntries, planWhatsNew, type ChangelogEntry } from "../lib/changelog";
 import { RELEASES } from "../lib/releases";
 import { adoptLegacySettings, getSettings, saveSettings } from "../lib/settings";
 import {
@@ -55,7 +55,7 @@ import Settings from "./Settings";
 import SortMenu from "./SortMenu";
 import TaskComposer from "./TaskComposer";
 import TaskRow from "./TaskRow";
-import WhatsNew, { ChangeSections } from "./WhatsNew";
+import WhatsNew, { ReleaseEntries } from "./WhatsNew";
 
 type View = "home" | "settings";
 
@@ -94,8 +94,8 @@ export default function App() {
   const [linked, setLinked] = useState(false);
   /** A newer release found by the daily check, until the user dismisses it. */
   const [update, setUpdate] = useState<FoundUpdate | null>(null);
-  /** Its release notes, parsed once; shown under the notice on request. */
-  const updateNotes = useMemo(() => parseReleaseNotes(update?.notes), [update]);
+  /** The notes of every release it brings, parsed once; shown under the notice on request. */
+  const updateNotes = useMemo(() => missedEntries(update?.missed), [update]);
   const [notesOpen, setNotesOpen] = useState(false);
   /** While the update downloads: percent, or -1 while the size is unknown. */
   const [installing, setInstalling] = useState<number | null>(null);
@@ -348,10 +348,14 @@ export default function App() {
                     setNotesId(null);
                     setView("settings");
                   }}
-                  className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[18px] text-neutral-500 transition-colors hover:bg-neutral-200/70 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+                  className="group ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[18px] text-neutral-500 transition-colors hover:bg-neutral-200/70 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
                   title="Settings"
                 >
-                  <SettingsIcon />
+                  {/* The cog turns on hover. It stays on its own layer, as a
+                      block of an even size (18px), so it is drawn the same at
+                      rest as while turning: otherwise its centre lands on a
+                      half pixel and visibly jumps when the turn back ends. */}
+                  <SettingsIcon className="block will-change-transform motion-safe:transition-transform motion-safe:duration-300 motion-safe:ease-[ease] motion-safe:group-hover:rotate-45" />
                 </button>
               </header>
 
@@ -410,9 +414,9 @@ export default function App() {
                   {notesOpen && updateNotes.length > 0 && (
                     <div
                       id="update-notes"
-                      className="tidy-scroll mt-1.5 max-h-40 overflow-y-auto pr-1"
+                      className="tidy-scroll mt-1.5 max-h-40 space-y-2 overflow-y-auto pr-1"
                     >
-                      <ChangeSections sections={updateNotes} />
+                      <ReleaseEntries entries={updateNotes} />
                     </div>
                   )}
                 </div>
