@@ -1,7 +1,7 @@
 {
   "name": "dash",
   "private": true,
-  "version": "0.4.2",
+  "version": "0.5.0",
   "type": "module",
   "description": "Dash — a cross-platform quick-capture to-do app (Tauri v2 + React + SQLite).",
   "scripts": {

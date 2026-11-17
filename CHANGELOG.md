@@ -2,6 +2,12 @@
 
 All notable changes to Dash. Versions from 0.4.0 on match the GitHub releases.
 
+## [0.5.0] — 2026-11-17
+### Added
+- Install updates from inside Dash: "Install" in the update notice or in Settings downloads the new version, checks it is signed by Dash, installs it and restarts. Your tasks stay. (This version itself is the last one to install by hand.)
+### Changed
+- Dash's code is public on GitHub, so the update check now finds new versions.
+
 ## [0.4.2] — 2026-11-16
 ### Added
 - "What's new": after an update, the main window shows what changed since the version you had.
