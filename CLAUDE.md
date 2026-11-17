@@ -87,6 +87,8 @@ the repo or the vault), stored as repo secrets `TAURI_SIGNING_PRIVATE_KEY` /
 fails. Builds signed with another key are refused by installed apps, so losing
 it means everyone installs by hand once more.
 
+After it is published, point the 404canvas download page (404canvas.ch/projects/dash) at it: `C:\devĄcanvas\privateelease-dash.json` (version, the three asset URLs, SHA-256 from the release's `.sha256` files), commit "release: Dash vX.Y.Z", push.
+
 ## Only Michele can do
 - Keep the repo public (the update check and the updater read its releases
   without a token).
