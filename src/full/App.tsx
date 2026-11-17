@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CogIcon } from "../components/CogIcon";
 import {
   countTasks,
   createFolder,
@@ -45,7 +46,6 @@ import {
   FolderIcon,
   InboxIcon,
   MenuIcon,
-  SettingsIcon,
   XIcon,
 } from "../components/icons";
 import FolderList from "./FolderList";
@@ -355,7 +355,7 @@ export default function App() {
                   title="Settings"
                 >
                   {/* Turns one tooth on hover (index.css, .cog-turn). */}
-                  <SettingsIcon
+                  <CogIcon
                     className={`block${cogTurning ? " cog-turn" : ""}`}
                     onAnimationEnd={() => setCogTurning(false)}
                   />

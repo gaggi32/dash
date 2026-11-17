@@ -2,6 +2,12 @@
 
 All notable changes to Dash. Versions from 0.4.0 on match the GitHub releases.
 
+## [1.2.2] — 2026-11-17
+### Changed
+- After an update, "What's new" lists up to ten versions you skipped, not three.
+### Fixed
+- The Settings cog no longer hops a pixel when it starts or stops turning.
+
 ## [1.2.1] — 2026-11-17
 ### Changed
 - The "What's new" card and the update notes are easier to read: coloured New, Improved and Fixed labels, a bullet per change, and older versions folded to one line each.
