@@ -1,6 +1,6 @@
 [package]
 name = "dash"
-version = "1.2.0"
+version = "1.2.1"
 description = "Dash — quick-capture to-do app"
 authors = ["gaggi32"]
 edition = "2021"
