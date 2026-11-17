@@ -41,9 +41,10 @@ the PC.
 - `CHANGELOG.md` bundled with `?raw` (`src/lib/releases.ts`), parsed by
   `src/lib/changelog.ts` for the main window's "What's new" card
   (`src/full/WhatsNew.tsx`), shown once after an update; `lastSeenVersion` in
-  `settings.json` remembers what was seen. A newer release's notes (its
-  GitHub body, i.e. the same section) come back from `check_update` and are
-  parsed by `parseReleaseNotes`, shown before installing in the update notice
+  `settings.json` remembers what was seen. Every release newer than the
+  running one comes back from `check_update` as `missed` (version + GitHub body,
+  newest first, from `releases?per_page=20`, falling back to the latest alone),
+  read by `missedEntries` / `parseReleaseNotes`, shown before installing in the update notice
   ("What's new" toggle) and in Settings after "Check now".
 
 ## Conventions
