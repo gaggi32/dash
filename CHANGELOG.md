@@ -2,6 +2,12 @@
 
 All notable changes to Dash. Versions from 0.4.0 on match the GitHub releases.
 
+## [1.2.1] — 2026-11-17
+### Changed
+- The "What's new" card and the update notes are easier to read: coloured New, Improved and Fixed labels, a bullet per change, and older versions folded to one line each.
+### Fixed
+- The Settings cog turns one tooth when you point at it and no longer jumps when the mouse leaves.
+
 ## [1.2.0] — 2026-11-17
 ### Added
 - The Settings cog turns when you point at it.

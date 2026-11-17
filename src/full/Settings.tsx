@@ -529,7 +529,7 @@ function UpdatesSection() {
               ? `What's new since ${version}`
               : `What's new in ${result.latest}`}
           </h3>
-          <div className="tidy-scroll mt-0.5 max-h-56 space-y-2 overflow-y-auto pr-1">
+          <div className="tidy-scroll mt-2 max-h-80 overflow-y-auto pr-1">
             <ReleaseEntries entries={result.notes} />
           </div>
           <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
