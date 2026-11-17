@@ -65,7 +65,18 @@
     "macOS": {
       "minimumSystemVersion": "11.0",
       "signingIdentity": "-"
-    }
+    },
+    "createUpdaterArtifacts": true
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERBNkE0MzAwMkE3NUQyQTUKUldTbDBuVXFBRU5xMm9LMjQ0b2hBL0dtU1lGaXcrbVNTV2ExdXliRTRVdEpwK0pHUStHWTVhQVoK",
+      "endpoints": [
+        "https://github.com/gaggi32/dash/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
 }

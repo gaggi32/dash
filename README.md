@@ -57,7 +57,9 @@ working. Use **Quit** in the tray menu to stop it.
 - **Share with other Windows accounts**: see "Privacy and security" below.
 - **Check for updates**: once a day Dash asks GitHub for the newest version
   number and shows a small notice if there is one. **Check now** does it on
-  demand. Updating is always your own download.
+  demand. **Install** downloads the new version from GitHub, checks it is
+  signed by Dash's release key, installs it and restarts; your tasks stay.
+  **Download** opens the release page if you'd rather install it yourself.
 
 ## Your data
 
@@ -77,9 +79,10 @@ running.
 
 - Everything stays on your computer. Dash has no account, no server and no
   telemetry.
-- The only network request is the update check. It asks `api.github.com` for
-  the version number of the newest Dash release, and you can turn it off in
-  Settings.
+- The only network requests are the update check, which asks `api.github.com`
+  for the version number of the newest Dash release (you can turn it off in
+  Settings), and, when you press Install, the download of that release from
+  `github.com`. An update not signed with Dash's release key is refused.
 - The windows only show Dash's own pages: a strict content security policy is
   set, and navigating anywhere else is blocked.
 - Attached files are copied into the app folder under a cleaned-up name and

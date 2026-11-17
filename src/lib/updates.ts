@@ -1,10 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getSettings, saveSettings } from "./settings";
 
 /**
  * Update check. Rust asks GitHub for the newest published release of Dash and
- * returns only its version; installing is always the user's own download from
- * the releases page. Nothing else leaves the computer.
+ * returns only its version. Installing is either in the app (installUpdate:
+ * Tauri's updater downloads the release, checks it is signed with Dash's
+ * release key, installs it and restarts) or the user's own download from the
+ * releases page. Nothing else leaves the computer.
  */
 export interface UpdateInfo {
   current: string;
@@ -56,6 +59,28 @@ export function checkUpdate(): Promise<UpdateInfo> {
 
 export function appVersion(): Promise<string> {
   return invoke<string>("app_version");
+}
+
+/**
+ * Download, check the signature, install and restart. `onProgress` gets the
+ * percent downloaded, or -1 while the size is unknown. Only returns on a
+ * failure: on success the app restarts.
+ */
+export async function installUpdate(onProgress: (pct: number) => void): Promise<void> {
+  const off = await listen<number>("update-progress", (e) => onProgress(e.payload));
+  try {
+    await invoke<void>("install_update");
+  } finally {
+    off();
+  }
+}
+
+/** The install button's text: null before it is pressed, then the progress. */
+export function installLabel(version: string, progress: number | null): string {
+  if (progress === null) return `Install ${version}`;
+  if (progress < 0) return "Downloading…";
+  if (progress >= 100) return "Installing…";
+  return `Downloading ${Math.round(progress)}%`;
 }
 
 export function openDownloadPage(): Promise<void> {

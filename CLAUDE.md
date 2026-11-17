@@ -61,10 +61,11 @@ the PC.
 - Version lives in three places: `package.json`, `src-tauri/tauri.conf.json`,
   `src-tauri/Cargo.toml`. The release job refuses a tag that does not match all
   three.
-- The repo is private (Michele's decision, 2026-11-16). The update check reads
-  `api.github.com/repos/gaggi32/dash/releases/latest` without a token, so it
-  can't see the releases: installs and updates are by hand from the release
-  page, while signed in. No in-app updater for the same reason.
+- The repo is public (since 2026-11-17; recreated that day so no pre-rewrite
+  commits remain). The update check reads
+  `api.github.com/repos/gaggi32/dash/releases/latest` without a token, and the
+  in-app updater (`install_update`, main window only) reads
+  `releases/latest/download/latest.json`, so both need the repo public.
 
 ## Releasing
 Every release first adds its section to `CHANGELOG.md`:
@@ -75,14 +76,20 @@ notes and the in-app "What's new" card; the release job refuses a tag without
 one, and `npm test` fails when `package.json`'s version has none.
 Then bump the three versions, commit, tag `vX.Y.Z`, push the tag.
 `.github/workflows/release.yml` tests, builds Windows x64 + macOS arm64/x64,
-uploads installers and `.sha256` files to a draft release and publishes it (no
-`release` environment exists, so the publish job runs unprotected). Actions
-minutes on a private repo count against the free quota, macOS ones x10.
-macOS runners sometimes never start: rerun the failed jobs.
+signs each build for the updater, uploads installers, `.sha256`, `.sig` and
+`latest.json` to a draft release and publishes it in the `release` environment
+(deployment tags `v*`). macOS runners sometimes never start: rerun the failed
+jobs.
+Updater key: `C:\Users\miche\.tauri\dash-updater.key` and `.password` (never in
+the repo or the vault), stored as repo secrets `TAURI_SIGNING_PRIVATE_KEY` /
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; the public key is
+`plugins.updater.pubkey` in `tauri.conf.json`. Without the secrets the build
+fails. Builds signed with another key are refused by installed apps, so losing
+it means everyone installs by hand once more.
 
 ## Only Michele can do
-- Install each release by hand (signed in to GitHub): the repo stays private,
-  so the app can't offer it.
-- Optional: a `release` environment (Settings → Environments, deployment tags
-  `v*`) to protect the publish step.
+- Keep the repo public (the update check and the updater read its releases
+  without a token).
+- Keep a backup of the updater key and its password (a password manager), and
+  set the two repo secrets from them.
 - Code signing certificates (Apple Developer ID, Windows signing) if wanted.

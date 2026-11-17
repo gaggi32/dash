@@ -14,6 +14,8 @@ import { getSettings, saveSettings } from "../lib/settings";
 import {
   appVersion,
   checkUpdate,
+  installLabel,
+  installUpdate,
   openDownloadPage,
   setCheckUpdates,
 } from "../lib/updates";
@@ -352,6 +354,9 @@ function UpdatesSection() {
   const [enabled, setEnabled] = useState(true);
   const [version, setVersion] = useState("");
   const [checking, setChecking] = useState(false);
+  /** While an update downloads: percent, or -1 while the size is unknown. */
+  const [installing, setInstalling] = useState<number | null>(null);
+  const [installError, setInstallError] = useState<string | null>(null);
   const [result, setResult] = useState<
     { kind: "newer"; latest: string } | { kind: "current" } | { kind: "error"; message: string } | null
   >(null);
@@ -365,9 +370,22 @@ function UpdatesSection() {
       .catch(() => {});
   }, []);
 
+  const install = async () => {
+    setInstalling(-1);
+    setInstallError(null);
+    try {
+      // Restarts the app when it is done, so this only returns on a failure.
+      await installUpdate(setInstalling);
+    } catch (err) {
+      setInstallError(`${String(err)} You can still get it from the download page.`);
+      setInstalling(null);
+    }
+  };
+
   const checkNow = async () => {
     setChecking(true);
     setResult(null);
+    setInstallError(null);
     try {
       const info = await checkUpdate();
       setResult(
@@ -406,7 +424,8 @@ function UpdatesSection() {
           <span className="block font-medium">Check for updates</span>
           <span className="block text-xs text-neutral-500 dark:text-neutral-400">
             Once a day, asks GitHub for the newest version number. Nothing about
-            you or your tasks is sent.
+            you or your tasks is sent, and nothing is downloaded until you press
+            Install.
           </span>
         </span>
       </label>
@@ -429,16 +448,28 @@ function UpdatesSection() {
           </span>
         )}
         {result?.kind === "newer" && (
-          <span className="text-xs text-neutral-700 dark:text-neutral-200">
-            Dash {result.latest} is out.{" "}
+          <span className="flex flex-wrap items-center gap-2 text-xs text-neutral-700 dark:text-neutral-200">
+            Dash {result.latest} is out.
+            <button
+              type="button"
+              onClick={() => void install()}
+              disabled={installing !== null}
+              className="rounded-md bg-neutral-900 px-2.5 py-1 text-[12px] font-medium text-white transition-colors hover:bg-neutral-700 disabled:opacity-60 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+            >
+              {installLabel(result.latest, installing)}
+            </button>
             <button
               type="button"
               onClick={() => void openDownloadPage()}
-              className="font-medium underline underline-offset-2"
+              title="The release page on GitHub, to download the installer yourself"
+              className="underline underline-offset-2"
             >
-              Download
+              Download page
             </button>
           </span>
+        )}
+        {installError && (
+          <span className="w-full text-xs text-red-600 dark:text-red-400">{installError}</span>
         )}
         {result?.kind === "error" && (
           <span className="text-xs text-neutral-500 dark:text-neutral-400">
