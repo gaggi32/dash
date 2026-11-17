@@ -160,6 +160,13 @@ fn build_quick(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         .build()
 }
 
+/// What `quick-focus` tells the quick-add window as it is shown.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct QuickFocus {
+    keep_draft: bool,
+}
+
 /// Toggle the borderless quick-add window: show+center+focus, or hide.
 fn toggle_quick(app: &AppHandle) {
     if let Some(win) = app.get_webview_window(QUICK_LABEL) {
@@ -169,8 +176,13 @@ fn toggle_quick(app: &AppHandle) {
             let _ = win.center();
             let _ = win.show();
             let _ = win.set_focus();
-            // Tell the frontend to reset + focus the text input.
-            let _ = win.emit("quick-focus", ());
+            // Tell the frontend to focus the text input, and whether an unsent
+            // draft stays (otherwise it starts empty).
+            let keep_draft = app
+                .try_state::<Prefs>()
+                .map(|p| p.0.lock().expect("settings mutex poisoned").keep_quick_draft)
+                .unwrap_or(true);
+            let _ = win.emit("quick-focus", QuickFocus { keep_draft });
         }
     }
 }

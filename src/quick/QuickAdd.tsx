@@ -94,11 +94,20 @@ export default function QuickAdd() {
     loadFolders();
   }, [loadFolders]);
 
+  // Whether anything is typed or picked that was never sent. The folder alone
+  // doesn't count: it sticks after a send so a run of tasks lands together.
+  const hasDraft =
+    title.trim() !== "" || notes.trim() !== "" || due !== null || files.items.length > 0;
+  const hasDraftRef = useRef(hasDraft);
+  hasDraftRef.current = hasDraft;
+
   // Rust emits `quick-focus` each time it shows the window via the hotkey/tray.
-  // Reset the form, replay the entrance animation, and refocus the input.
+  // An unsent draft stays when the setting says so (closing only the pickers);
+  // otherwise the form starts empty. Then replay the entrance and refocus.
   useEffect(() => {
-    const un = listen("quick-focus", () => {
-      reset();
+    const un = listen<{ keepDraft?: boolean }>("quick-focus", (e) => {
+      if (e.payload?.keepDraft !== false && hasDraftRef.current) setPanel(null);
+      else reset();
       loadFolders();
       setAppear((n) => n + 1);
       focusInput();
@@ -173,7 +182,9 @@ export default function QuickAdd() {
       const pos = await win.outerPosition();
       await win.setPosition(new PhysicalPosition(pos.x, y));
     })();
-  }, [panel, notesOpen, win]);
+    // `appear` too: hide() shrinks the window, and a kept draft may have its
+    // notes open when it is shown again.
+  }, [panel, notesOpen, win, appear]);
 
   // Hide the confirmation again a moment after it appears.
   useEffect(() => {

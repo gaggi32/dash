@@ -47,6 +47,9 @@ pub struct Settings {
     /// The version whose "What's new" the user has seen (or that was running
     /// when the field first appeared). Empty until the main window sets it.
     pub last_seen_version: String,
+    /// Keep what was typed in the quick-add panel but never sent when it is
+    /// closed, and show it again when it opens. Sending a task still clears it.
+    pub keep_quick_draft: bool,
 }
 
 impl Default for Settings {
@@ -58,6 +61,7 @@ impl Default for Settings {
             dismissed_update: String::new(),
             last_scope: "all".into(),
             last_seen_version: String::new(),
+            keep_quick_draft: true,
         }
     }
 }
@@ -80,6 +84,8 @@ pub struct Patch {
     pub last_scope: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_seen_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keep_quick_draft: Option<bool>,
 }
 
 impl Patch {
@@ -101,6 +107,9 @@ impl Patch {
         }
         if let Some(v) = &self.last_seen_version {
             settings.last_seen_version = v.clone();
+        }
+        if let Some(v) = self.keep_quick_draft {
+            settings.keep_quick_draft = v;
         }
     }
 
@@ -198,6 +207,7 @@ mod tests {
         assert_eq!(s.dismissed_update, "");
         assert_eq!(s.last_scope, "all");
         assert_eq!(s.last_seen_version, "");
+        assert!(s.keep_quick_draft);
     }
 
     #[test]
@@ -215,6 +225,7 @@ mod tests {
             dismissed_update: "0.5.0".into(),
             last_scope: "12".into(),
             last_seen_version: "0.4.1".into(),
+            keep_quick_draft: false,
         };
         let json = serde_json::to_string_pretty(&s).unwrap();
         for key in [
@@ -224,6 +235,7 @@ mod tests {
             "dismissedUpdate",
             "lastScope",
             "lastSeenVersion",
+            "keepQuickDraft",
         ] {
             assert!(json.contains(key), "{json}");
         }
@@ -287,6 +299,7 @@ mod tests {
             dismissed_update: None,
             last_scope: None,
             last_seen_version: None,
+            keep_quick_draft: None,
         };
 
         // No file yet: everything localStorage had comes across.

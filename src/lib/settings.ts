@@ -22,6 +22,8 @@ export interface Settings {
   lastScope: string;
   /** Version whose "What's new" was seen; "" until the main window sets it. */
   lastSeenVersion: string;
+  /** Keep an unsent quick-add draft when the panel closes; sending still clears it. */
+  keepQuickDraft: boolean;
 }
 
 /** Index signature so `invoke` accepts it inside its argument record. */
