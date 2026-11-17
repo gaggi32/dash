@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   countTasks,
   createFolder,
@@ -14,7 +14,7 @@ import {
 } from "../lib/db";
 import { onDbChanged, onTasksChanged } from "../lib/events";
 import { isLinked } from "../lib/link";
-import { planWhatsNew, type ChangelogEntry } from "../lib/changelog";
+import { parseReleaseNotes, planWhatsNew, type ChangelogEntry } from "../lib/changelog";
 import { RELEASES } from "../lib/releases";
 import { adoptLegacySettings, getSettings, saveSettings } from "../lib/settings";
 import {
@@ -24,6 +24,7 @@ import {
   installLabel,
   installUpdate,
   openDownloadPage,
+  type FoundUpdate,
 } from "../lib/updates";
 import type {
   Filter,
@@ -54,7 +55,7 @@ import Settings from "./Settings";
 import SortMenu from "./SortMenu";
 import TaskComposer from "./TaskComposer";
 import TaskRow from "./TaskRow";
-import WhatsNew from "./WhatsNew";
+import WhatsNew, { ChangeSections } from "./WhatsNew";
 
 type View = "home" | "settings";
 
@@ -92,7 +93,10 @@ export default function App() {
   const [view, setView] = useState<View>("home");
   const [linked, setLinked] = useState(false);
   /** A newer release found by the daily check, until the user dismisses it. */
-  const [update, setUpdate] = useState<string | null>(null);
+  const [update, setUpdate] = useState<FoundUpdate | null>(null);
+  /** Its release notes, parsed once; shown under the notice on request. */
+  const updateNotes = useMemo(() => parseReleaseNotes(update?.notes), [update]);
+  const [notesOpen, setNotesOpen] = useState(false);
   /** While the update downloads: percent, or -1 while the size is unknown. */
   const [installing, setInstalling] = useState<number | null>(null);
   const [installError, setInstallError] = useState<string | null>(null);
@@ -352,44 +356,65 @@ export default function App() {
               </header>
 
               {update && (
-                <div className="mx-4 mb-3 flex items-center gap-3 rounded-lg border border-neutral-200 bg-white/70 px-3 py-2 text-[13px] sm:mx-6 dark:border-neutral-800 dark:bg-neutral-900/60">
-                  <span className="min-w-0 flex-1 truncate text-neutral-600 dark:text-neutral-300">
-                    {installError ?? `Dash ${update} is available.`}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setInstalling(-1);
-                      setInstallError(null);
-                      // Restarts the app when done: only a failure comes back.
-                      installUpdate(setInstalling).catch(() => {
-                        setInstalling(null);
-                        setInstallError("Could not install it here.");
-                      });
-                    }}
-                    disabled={installing !== null}
-                    className="shrink-0 font-medium text-neutral-900 underline-offset-2 hover:underline disabled:opacity-60 dark:text-neutral-100"
-                  >
-                    {installLabel(update, installing)}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void openDownloadPage()}
-                    className="shrink-0 text-neutral-500 underline-offset-2 hover:underline dark:text-neutral-400"
-                  >
-                    Download
-                  </button>
-                  <button
-                    type="button"
-                    disabled={installing !== null}
-                    onClick={() => {
-                      void dismissUpdate(update);
-                      setUpdate(null);
-                    }}
-                    className="shrink-0 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
-                  >
-                    Not now
-                  </button>
+                <div className="mx-4 mb-3 rounded-lg border border-neutral-200 bg-white/70 px-3 py-2 text-[13px] sm:mx-6 dark:border-neutral-800 dark:bg-neutral-900/60">
+                  <div className="flex items-center gap-3">
+                    <span className="min-w-0 flex-1 truncate text-neutral-600 dark:text-neutral-300">
+                      {installError ?? `Dash ${update.version} is available.`}
+                    </span>
+                    {updateNotes.length > 0 && (
+                      <button
+                        type="button"
+                        aria-expanded={notesOpen}
+                        aria-controls="update-notes"
+                        onClick={() => setNotesOpen((open) => !open)}
+                        className="shrink-0 text-neutral-500 underline-offset-2 hover:underline dark:text-neutral-400"
+                      >
+                        {notesOpen ? "Hide what's new" : "What's new"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInstalling(-1);
+                        setInstallError(null);
+                        // Restarts the app when done: only a failure comes back.
+                        installUpdate(setInstalling).catch(() => {
+                          setInstalling(null);
+                          setInstallError("Could not install it here.");
+                        });
+                      }}
+                      disabled={installing !== null}
+                      className="shrink-0 font-medium text-neutral-900 underline-offset-2 hover:underline disabled:opacity-60 dark:text-neutral-100"
+                    >
+                      {installLabel(update.version, installing)}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void openDownloadPage()}
+                      className="shrink-0 text-neutral-500 underline-offset-2 hover:underline dark:text-neutral-400"
+                    >
+                      Download
+                    </button>
+                    <button
+                      type="button"
+                      disabled={installing !== null}
+                      onClick={() => {
+                        void dismissUpdate(update.version);
+                        setUpdate(null);
+                      }}
+                      className="shrink-0 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
+                    >
+                      Not now
+                    </button>
+                  </div>
+                  {notesOpen && updateNotes.length > 0 && (
+                    <div
+                      id="update-notes"
+                      className="tidy-scroll mt-1.5 max-h-40 overflow-y-auto pr-1"
+                    >
+                      <ChangeSections sections={updateNotes} />
+                    </div>
+                  )}
                 </div>
               )}
 

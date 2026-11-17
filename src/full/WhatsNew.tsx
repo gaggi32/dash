@@ -1,4 +1,4 @@
-import type { ChangelogEntry } from "../lib/changelog";
+import type { ChangelogEntry, ChangelogSection } from "../lib/changelog";
 
 interface Props {
   /** The running version, named in the title. */
@@ -53,18 +53,7 @@ export default function WhatsNew({ version, entries, more, onDone }: Props) {
                 )}
               </p>
             )}
-            {entry.sections.map((section) => (
-              <div key={section.heading} className="mt-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                  {section.heading}
-                </p>
-                <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-[12.5px] leading-snug text-neutral-600 marker:text-neutral-300 dark:text-neutral-300 dark:marker:text-neutral-600">
-                  {section.items.map((item, i) => (
-                    <li key={i}>{inline(item)}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+            <ChangeSections sections={entry.sections} />
           </div>
         ))}
         {more && (
@@ -74,6 +63,29 @@ export default function WhatsNew({ version, entries, more, onDone }: Props) {
         )}
       </div>
     </section>
+  );
+}
+
+/**
+ * One version's "Added / Changed / …" headings and their items: on the card,
+ * and for an update's notes before it is installed (notice and Settings).
+ */
+export function ChangeSections({ sections }: { sections: ChangelogSection[] }) {
+  return (
+    <>
+      {sections.map((section) => (
+        <div key={section.heading} className="mt-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+            {section.heading}
+          </p>
+          <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-[12.5px] leading-snug text-neutral-600 marker:text-neutral-300 dark:text-neutral-300 dark:marker:text-neutral-600">
+            {section.items.map((item, i) => (
+              <li key={i}>{inline(item)}</li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </>
   );
 }
 

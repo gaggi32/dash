@@ -609,6 +609,8 @@ struct UpdateInfo {
     current: String,
     latest: Option<String>,
     newer: bool,
+    /// The release's notes: its CHANGELOG section, as the release job writes it.
+    notes: Option<String>,
 }
 
 fn parse_version(v: &str) -> Option<(u64, u64, u64)> {
@@ -623,6 +625,16 @@ fn release_version(body: &Json) -> Option<String> {
     (v.len() <= 20 && parse_version(v).is_some()).then(|| v.to_string())
 }
 
+/// Release notes longer than this are cut: a CHANGELOG section is far shorter.
+const MAX_NOTES_CHARS: usize = 8000;
+
+/// The notes in a GitHub release answer ("body"), cut to [`MAX_NOTES_CHARS`];
+/// none when missing or blank. Shown as plain text, never as HTML.
+fn release_notes(body: &Json) -> Option<String> {
+    let notes: String = body.get("body")?.as_str()?.chars().take(MAX_NOTES_CHARS).collect();
+    (!notes.trim().is_empty()).then_some(notes)
+}
+
 fn is_newer(latest: &str, current: &str) -> bool {
     match (parse_version(latest), parse_version(current)) {
         (Some(l), Some(c)) => l > c,
@@ -630,8 +642,8 @@ fn is_newer(latest: &str, current: &str) -> bool {
     }
 }
 
-/// Ask GitHub for the newest published release. Only its version is read;
-/// installing is [`install_update`], or the user's own download.
+/// Ask GitHub for the newest published release. Only its version and notes
+/// are read; installing is [`install_update`], or the user's own download.
 #[tauri::command]
 async fn check_update(app: AppHandle) -> Result<UpdateInfo, String> {
     let current = app.package_info().version.to_string();
@@ -652,7 +664,8 @@ async fn check_update(app: AppHandle) -> Result<UpdateInfo, String> {
     let body: Json = res.json().await.map_err(|_| "Unexpected answer".to_string())?;
     let latest = release_version(&body);
     let newer = latest.as_deref().map_or(false, |l| is_newer(l, &current));
-    Ok(UpdateInfo { current, latest, newer })
+    let notes = release_notes(&body);
+    Ok(UpdateInfo { current, latest, newer, notes })
 }
 
 /// Download the newest release, check its signature against the key built
@@ -1005,5 +1018,18 @@ mod tests {
         assert_eq!(v(r#"{"tag_name":"nightly"}"#), None);
         assert_eq!(v(r#"{"name":"v1.0.0"}"#), None);
         assert_eq!(v(r#"{"tag_name":5}"#), None);
+    }
+
+    #[test]
+    fn release_notes_are_the_body_cut_to_size() {
+        use serde_json::json;
+        let notes = "### Added\r\n- One.";
+        assert_eq!(release_notes(&json!({ "body": notes })).as_deref(), Some(notes));
+        assert_eq!(release_notes(&json!({ "tag_name": "v1.0.0" })), None);
+        assert_eq!(release_notes(&json!({ "body": null })), None);
+        assert_eq!(release_notes(&json!({ "body": 5 })), None);
+        assert_eq!(release_notes(&json!({ "body": "  \n " })), None);
+        let long = json!({ "body": "é".repeat(MAX_NOTES_CHARS + 50) });
+        assert_eq!(release_notes(&long).unwrap().chars().count(), MAX_NOTES_CHARS);
     }
 }

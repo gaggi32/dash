@@ -1,5 +1,6 @@
 /**
- * CHANGELOG.md read as data, for the "What's new" card after an update.
+ * CHANGELOG.md read as data, for the "What's new" card after an update, and
+ * a release's notes, for what an update about to be installed brings.
  *
  * The release job turns the same file into the GitHub release notes, so the
  * card and the release page say the same thing. Pure functions only: the
@@ -28,6 +29,29 @@ const SECTION_HEAD = /^###\s+(.+?)\s*$/;
 const ITEM = /^[-*]\s+(.+)$/;
 
 /**
+ * Adds one line of a version's body to its sections: a `### ` heading starts
+ * a section, a `- ` item joins the last one, and an indented line carries on
+ * the item above it. Anything else (and items before any heading) is skipped.
+ */
+function addLine(sections: ChangelogSection[], line: string): void {
+  const head = SECTION_HEAD.exec(line);
+  if (head) {
+    sections.push({ heading: head[1], items: [] });
+    return;
+  }
+  const section = sections[sections.length - 1];
+  if (!section) return;
+  const item = ITEM.exec(line);
+  if (item) {
+    section.items.push(item[1].trim());
+  } else if (/^\s+\S/.test(line) && section.items.length > 0) {
+    section.items[section.items.length - 1] += ` ${line.trim()}`;
+  }
+}
+
+const filled = (sections: ChangelogSection[]) => sections.filter((s) => s.items.length > 0);
+
+/**
  * Every version in the file, in file order (newest first). `## [Unreleased]`
  * and anything above the first version are skipped, and so are headings with
  * nothing under them. An indented line carries on the item above it.
@@ -35,7 +59,6 @@ const ITEM = /^[-*]\s+(.+)$/;
 export function parseChangelog(text: string): ChangelogEntry[] {
   const entries: ChangelogEntry[] = [];
   let entry: ChangelogEntry | null = null;
-  let section: ChangelogSection | null = null;
 
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trimEnd();
@@ -43,29 +66,35 @@ export function parseChangelog(text: string): ChangelogEntry[] {
       const m = VERSION_HEAD.exec(line);
       entry = m ? { version: m[1], date: m[2] ?? "", sections: [] } : null;
       if (entry) entries.push(entry);
-      section = null;
       continue;
     }
-    if (!entry) continue;
-
-    const head = SECTION_HEAD.exec(line);
-    if (head) {
-      section = { heading: head[1], items: [] };
-      entry.sections.push(section);
-      continue;
-    }
-    if (!section) continue;
-
-    const item = ITEM.exec(line);
-    if (item) {
-      section.items.push(item[1].trim());
-    } else if (/^\s+\S/.test(line) && section.items.length > 0) {
-      section.items[section.items.length - 1] += ` ${line.trim()}`;
-    }
+    if (entry) addLine(entry.sections, line);
   }
 
-  for (const e of entries) e.sections = e.sections.filter((s) => s.items.length > 0);
+  for (const e of entries) e.sections = filled(e.sections);
   return entries;
+}
+
+/**
+ * The sections of a release's notes, as GitHub has them: the release job
+ * writes the version's CHANGELOG.md section without its `## [x.y.z]` line, so
+ * the same rules apply. Empty when the notes are missing or have no
+ * `### ` sections with items.
+ */
+export function parseReleaseNotes(notes: string | null | undefined): ChangelogSection[] {
+  if (!notes) return [];
+  const sections: ChangelogSection[] = [];
+  for (const raw of notes.split(/\r?\n/)) {
+    const line = raw.trimEnd();
+    // A version heading would belong to another entry: stop at the first one
+    // after any sections (notes written by hand might repeat their own).
+    if (line.startsWith("## ")) {
+      if (sections.length > 0) break;
+      continue;
+    }
+    addLine(sections, line);
+  }
+  return filled(sections);
 }
 
 function parts(v: string): [number, number, number] | null {

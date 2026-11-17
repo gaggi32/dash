@@ -4,15 +4,23 @@ import { getSettings, saveSettings } from "./settings";
 
 /**
  * Update check. Rust asks GitHub for the newest published release of Dash and
- * returns only its version. Installing is either in the app (installUpdate:
- * Tauri's updater downloads the release, checks it is signed with Dash's
- * release key, installs it and restarts) or the user's own download from the
- * releases page. Nothing else leaves the computer.
+ * returns only its version and notes (what is new in it). Installing is
+ * either in the app (installUpdate: Tauri's updater downloads the release,
+ * checks it is signed with Dash's release key, installs it and restarts) or
+ * the user's own download from the releases page. Nothing else leaves the computer.
  */
 export interface UpdateInfo {
   current: string;
   latest: string | null;
   newer: boolean;
+  /** The release's notes (its CHANGELOG.md section), read with parseReleaseNotes. */
+  notes: string | null;
+}
+
+/** A newer release worth telling the user about. */
+export interface FoundUpdate {
+  version: string;
+  notes: string | null;
 }
 
 /**
@@ -89,9 +97,9 @@ export function openDownloadPage(): Promise<void> {
 
 /**
  * The launch-time check: runs only when enabled and due, never throws, and
- * returns the newer version worth telling the user about (or null).
+ * returns the newer release worth telling the user about (or null).
  */
-export async function autoCheck(now = Date.now()): Promise<string | null> {
+export async function autoCheck(now = Date.now()): Promise<FoundUpdate | null> {
   try {
     const settings = await getSettings();
     if (!settings.checkUpdates) return null;
@@ -101,7 +109,7 @@ export async function autoCheck(now = Date.now()): Promise<string | null> {
     write(LAST_KEY, String(now));
     if (!info.newer || !info.latest) return null;
     if (settings.dismissedUpdate === info.latest) return null;
-    return info.latest;
+    return { version: info.latest, notes: info.notes };
   } catch {
     // Offline, or no public release yet (or the settings unreachable): say
     // nothing, try again next launch.

@@ -41,7 +41,10 @@ the PC.
 - `CHANGELOG.md` bundled with `?raw` (`src/lib/releases.ts`), parsed by
   `src/lib/changelog.ts` for the main window's "What's new" card
   (`src/full/WhatsNew.tsx`), shown once after an update; `lastSeenVersion` in
-  `settings.json` remembers what was seen.
+  `settings.json` remembers what was seen. A newer release's notes (its
+  GitHub body, i.e. the same section) come back from `check_update` and are
+  parsed by `parseReleaseNotes`, shown before installing in the update notice
+  ("What's new" toggle) and in Settings after "Check now".
 
 ## Conventions
 - Data stays in `tauri-plugin-sql` (not a Rust-owned rusqlite like

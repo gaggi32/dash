@@ -4,6 +4,7 @@ import {
   compareVersions,
   entriesBetween,
   parseChangelog,
+  parseReleaseNotes,
   planWhatsNew,
 } from "./changelog";
 import { RELEASES } from "./releases";
@@ -142,5 +143,34 @@ describe("the bundled CHANGELOG.md", () => {
         expect(["Added", "Changed", "Fixed", "Removed"], e.version).toContain(s.heading);
       }
     }
+  });
+});
+
+describe("parseReleaseNotes", () => {
+  it("reads a release body the way the release job writes it", () => {
+    const body = "### Added\r\n- One.\r\n- Two that\r\n  carries on.\r\n### Fixed\r\n- Three.\r\n";
+    expect(parseReleaseNotes(body)).toEqual([
+      { heading: "Added", items: ["One.", "Two that carries on."] },
+      { heading: "Fixed", items: ["Three."] },
+    ]);
+  });
+
+  it("gives the same sections as the CHANGELOG entry it came from", () => {
+    // What the release job's awk prints for 0.10.0: the lines under its heading.
+    const body = SAMPLE.split("## [0.10.0] — 2026-12-01\n")[1].split("\n## [")[0];
+    expect(parseReleaseNotes(body)).toEqual(ENTRIES[0].sections);
+  });
+
+  it("is empty for missing notes or notes without sections", () => {
+    expect(parseReleaseNotes(null)).toEqual([]);
+    expect(parseReleaseNotes(undefined)).toEqual([]);
+    expect(parseReleaseNotes("")).toEqual([]);
+    expect(parseReleaseNotes("Just some words.\n- a stray item")).toEqual([]);
+    expect(parseReleaseNotes("### Removed\n")).toEqual([]);
+  });
+
+  it("stops at a later version heading", () => {
+    const body = "## [1.1.0]\n### Added\n- New.\n## [1.0.0]\n### Added\n- Old.";
+    expect(parseReleaseNotes(body)).toEqual([{ heading: "Added", items: ["New."] }]);
   });
 });
