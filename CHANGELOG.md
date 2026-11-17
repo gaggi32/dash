@@ -2,6 +2,12 @@
 
 All notable changes to Dash. Versions from 0.4.0 on match the GitHub releases.
 
+## [1.0.0] — 2026-11-17
+### Added
+- The quick-add panel keeps what you typed but did not add when it closes, and shows it again next time. Adding a task still empties it. Switch off in Settings ("Keep unsent text in the quick-add panel") to start empty every time.
+### Changed
+- Dash is 1.0: its first stable version.
+
 ## [0.5.0] — 2026-11-17
 ### Added
 - Install updates from inside Dash: "Install" in the update notice or in Settings downloads the new version, checks it is signed by Dash, installs it and restarts. Your tasks stay. (This version itself is the last one to install by hand.)
